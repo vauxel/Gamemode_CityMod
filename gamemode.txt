@@ -1,0 +1,55 @@
+﻿// ========= \\
+//  CityMod  \\
+// ========= \\
+
+// Enviroment
+$EnvGuiServer::SimpleMode 1
+$EnvGuiServer::SkyFile Add-Ons/Sky_Skylands/Skylands.dml
+$EnvGuiServer::WaterFile None
+$EnvGuiServer::GroundFile Add-Ons/Ground_Plate/plate.ground
+
+// CityMod Add-On
+ADDON Gamemode_CityMod
+ADDON Weapon_Gun
+
+// Extra Add-Ons
+ADDON Print_1x2f_Default
+ADDON Print_2x2f_Default
+ADDON Print_2x2r_Default
+ADDON Print_Letters_Default
+
+// MiniGame
+$MiniGame::Enabled 1
+$MiniGame::GameColor 0
+$MiniGame::InviteOnly 0
+$MiniGame::IncludeAllPlayersBricks 1
+$MiniGame::PlayersUseOwnBricks 0
+
+$MiniGame::Points_BreakBrick 0
+$MiniGame::Points_PlantBrick 0
+$MiniGame::Points_KillPlayer 1
+$MiniGame::Points_KillSelf 0
+
+$MiniGame::RespawnTime 1
+$MiniGame::VehicleRespawnTime 5
+$MiniGame::BrickRespawnTime 3000
+
+$MiniGame::UseSpawnBricks 0
+$MiniGame::FallingDamage 1
+$MiniGame::WeaponDamage 1
+$MiniGame::SelfDamage 1
+$MiniGame::VehicleDamage 1
+$MiniGame::BrickDamage 0
+$MiniGame::EnableWand 0
+$Minigame::EnableBuilding 0
+$MiniGame::EnablePainting 1
+
+$MiniGame::PlayerDataBlockName CityMod Player
+
+$MiniGame::StartEquipName0
+$MiniGame::StartEquipName1
+$MiniGame::StartEquipName2
+$MiniGame::StartEquipName3
+$MiniGame::StartEquipName4
+
+$Server::WelcomeMessage \c2Welcome to CityMod, %1.
