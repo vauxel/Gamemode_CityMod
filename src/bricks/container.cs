@@ -12,7 +12,7 @@
 // ============================================================
 
 datablock fxDTSBrickData(brickCMTestContainerData) {
-	brickFile = $CM::Config::Path::Mod @ "res/bricks/Container/TestContainer.blb";
+	brickFile = $CM::Config::Path::Mod @ "res/bricks/container/test_container.blb";
 
 	isCityModBrick = true;
 	citymodBrick["Type"] = "PROP";

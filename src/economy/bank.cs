@@ -12,13 +12,13 @@
 // Section 1 - Datablocks
 // ============================================================
 datablock fxDTSBrickData(brickCMATMData) {
-	brickFile = $CM::Config::Path::Mod @ "res/bricks/ATM/ATM.blb";
+	brickFile = $CM::Config::Path::Mod @ "res/bricks/atm/atm.blb";
 
 	isCityModBrick = true;
 	citymodBrick["Type"] = "PROP";
 	citymodBrick["Restriction"] = "NONE";
 
-	iconName = $CM::Config::Path::Mod @ "res/bricks/ATM/ATM.png";
+	iconName = $CM::Config::Path::Mod @ "res/bricks/atm/atm.png";
 	uiName = "ATM";
 };
 
