@@ -20,11 +20,13 @@ if(!isObject(CM_Organizations)) {
 	CM_Organizations.addField("Open", true);
 	CM_Organizations.addField("Hidden", false);
 	CM_Organizations.addField("Description", "A Default Description");
-	CM_Organizations.addField("Jobs", Array());
+	CM_Organizations.addField("Founded", "January 1, 1970");
+	CM_Organizations.addField("Founder", 888888);
+	CM_Organizations.addField("Jobs", Map());
 	CM_Organizations.addField("Members", Array());
 	CM_Organizations.addField("Invited", Array());
 	CM_Organizations.addField("Applications", Array());
-	CM_Organizations.addField("Account", 0);
+	CM_Organizations.addField("Account", "NONE");
 	CM_Organizations.loadAllData();
 
 	CityModOrganizationsModule.add(CM_Organizations);

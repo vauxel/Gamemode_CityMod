@@ -168,7 +168,6 @@ package CityMod_Tick_Daycycle {
 	}
 
 	function CM_Tick::getLongDate(%this) {
-		// Want to use the DMY calendar format; using MDY due to its prevalency in the U.S.
 		return %this.monthName[%this.month] SPC (%this.day + 1) @ "," SPC %this.year;
 	}
 

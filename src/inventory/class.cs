@@ -54,7 +54,7 @@ function CityModInventory::findAvailableSlot(%this, %item) {
 				%slot = %this.getSlot(%x, %y);
 
 				if(%slot $= "") {
-					return %x SPC %y SPC false;
+					return %x SPC %y;
 				}
 			}
 		}
@@ -65,10 +65,10 @@ function CityModInventory::findAvailableSlot(%this, %item) {
 
 				if(%slot $= "") {
 					if(%emptySlot $= "") {
-						%emptySlot = %x SPC %y SPC false;
+						%emptySlot = %x SPC %y;
 					}
-				} else if(%slot.get("Name") $= %item.get("Name")) {
-					return %x SPC %y SPC true;
+				} else if((%slot.get("Name") $= %item.get("Name")) && (%slot.get("Count") < 99) && ((%slot.get("Unique") != true) && (%item.get("Unique") != true))) {
+					return %x SPC %y SPC %slot.get("Count");
 				}
 			}
 		}
@@ -225,7 +225,7 @@ function CityModInventory::hasItem(%this, %name) {
 	return false;
 }
 
-function CityModInventory::addItem(%this, %type, %name, %datablock, %extra) {
+function CityModInventory::addItem(%this, %type, %name, %datablock, %count, %extra) {
 	if(%type $= "") {
 		CMError(2, "CityModInventory::addItem", "No \"%type\" given");
 		return;
@@ -252,14 +252,14 @@ function CityModInventory::addItem(%this, %type, %name, %datablock, %extra) {
 	}
 
 	%item = Map();
-	%item.set("Count", 1);
+	%item.set("Count", strLen(%count) && isInteger(%count) ? %count : 1);
 
 	if(isMapObject(%extra)) {
 		for(%i = 0; %i < %extra.keys.length; %i++) {
 			%item.set(%extra.keys.value[%i], %extra.get(%extra.keys.value[%i]));
 		}
 
-		%extra.delete();
+		%item.set("Unique", true);
 	}
 
 	%item.set("Type", strUpr(%type));
@@ -274,10 +274,34 @@ function CityModInventory::addItem(%this, %type, %name, %datablock, %extra) {
 		return "ERROR";
 	}
 
-	if(getWord(%slot, 2) == false) { // Empty slot
+	if(getWord(%slot, 2) $= "") { // Empty slot
+		if(%item.get("Count") > 99) {
+			%overflow = true;
+			%newcount = %item.get("Count") - 99;
+			%item.set("Count", 99);
+		}
+
 		%this.setSlot(getWord(%slot, 0), getWord(%slot, 1), %item, "LINK");
+
+		if(%overflow) {
+			%this.addItem(%item.get("Type"), %item.get("Name"), %item.get("Data"), %newcount, isObject(%extra) ? %extra.copy() : "");
+		}
 	} else { // Occupied, but stackable, slot
-		%this.getSlot(getWord(%slot, 0), getWord(%slot, 1)).set("Count", %this.getSlot(getWord(%slot, 0), getWord(%slot, 1)).get("Count") + 1);
+		if(%item.get("Count") + getWord(%slot, 2) > 99) {
+			%overflow = true;
+			%newcount = %item.get("Count") - (99 - getWord(%slot, 2));
+			%item.set("Count", 99 - getWord(%slot, 2));
+		}
+
+		%this.getSlot(getWord(%slot, 0), getWord(%slot, 1)).set("Count", getWord(%slot, 2) + %item.get("Count"));
+
+		if(%overflow) {
+			%this.addItem(%item.get("Type"), %item.get("Name"), %item.get("Data"), %newcount, isObject(%extra) ? %extra.copy() : "");
+		}
+	}
+
+	if(isObject(%extra)) {
+		%extra.delete();
 	}
 }
 

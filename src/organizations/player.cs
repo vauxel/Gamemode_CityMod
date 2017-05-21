@@ -20,11 +20,6 @@ function servercmdCM_Organizations_manageOrganization(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 1) {
-		commandtoclient(%client, 'CM_errorMessage', "CM_O_mO(2)", "INSUFFICIENT_PERMISSION");
-		return;
-	}
-
 	commandtoclient(%client, 'CM_Organizations_manageOrganization', %id, %organization.name);
 }
 
@@ -36,21 +31,48 @@ function servercmdCM_Organizations_requestOrganizations(%client) {
 	for(%i = 0; %i < CM_Organizations.dataTable.keys.length; %i++) {
 		%organization = CM_Organizations.getData(%id = CM_Organizations.dataTable.keys.value[%i]);
 
-		if(%organization.hidden && !%organization.isInvited(%client.bl_id) && (%organization.memberExists(%client.bl_id) == -1)) {
+		if(%organization.hidden && !%organization.isInvited(%client.bl_id) && !%organization.memberExists(%client.bl_id)) {
 			continue;
 		}
 
-		commandtoclient(%client, 'CM_Organizations_addOrganization', %id, %organization.type, %organization.open, %organization.owner, %organization.name, (%organization.members.length + 1), %organization.getJobOpenings(), ((%organization.memberExists(%client.bl_id) != -1) || (%organization.owner == %client.bl_id)));
+		commandtoclient(%client, 'CM_Organizations_addOrganization', %id, %organization.type, %organization.open, CM_Players.getData(%organization.owner).name, %organization.name, (%organization.members.length + 1), %organization.getJobOpenings(), (%organization.memberExists(%client.bl_id) || (%organization.owner == %client.bl_id)));
 	}
 }
 
-function servercmdCM_Organizations_requestUserPrivelegeLevel(%client, %id) {
+function servercmdCM_Organizations_requestUserPrivilegeLevel(%client, %id) {
 	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rUPL(1)", "INVALID_ID");
 		return;
 	}
 
-	commandtoclient(%client, 'CM_Organizations_setUserPrivelegeLevel', CM_Organizations.getData(%id).getUserPrivelegeLevel(%client.bl_id));
+	commandtoclient(%client, 'CM_Organizations_setUserPrivilegeLevel', CM_Organizations.getData(%id).getUserPrivilegeLevel(%client.bl_id));
+}
+
+function servercmdCM_Organizations_requestOverviewInfo(%client, %id) {
+	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_rOI(1)", "INVALID_ID");
+		return;
+	}
+
+	%organization = CM_Organizations.getData(%id);
+
+	%openings = 0;
+	%avgsalary = 0;
+
+	for(%i = 0; %i < %organization.jobs.keys.length; %i++) {
+		%job = %organization.jobs.get(%organization.jobs.keys.value[%i]);
+		%openings += %job.get("Openings");
+		%avgsalary += (%job.get("Salary") / %organization.jobs.keys.length);
+	}
+
+	if(!%organization.memberExists(%client.bl_id)) {
+		commandtoclient(%client, 'CM_Organizations_setOverviewInfo', %organization.name, %organization.founded, CM_Players.getData(%organization.founder).name, CM_Players.getData(%organization.owner).name, %organization.members.length, %organization.jobs.keys.length, %openings, %avgsalary);
+	} else {
+		%member = %organization.members.value[%organization.findMember(%client.bl_id)];
+		%memberJob = %organization.jobs.get(%member.get("JobID"));
+
+		commandtoclient(%client, 'CM_Organizations_setOverviewInfo', %organization.name, %organization.founded, CM_Players.getData(%organization.founder).name, CM_Players.getData(%organization.owner).name, %organization.members.length, %organization.jobs.keys.length, %openings, %avgsalary, %member.get("Hired"), %memberJob.get("Name"), %memberJob.get("Salary"), %member.get("Infractions"));
+	}
 }
 
 function servercmdCM_Organizations_requestGeneralInfo(%client, %id) {
@@ -61,7 +83,7 @@ function servercmdCM_Organizations_requestGeneralInfo(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 1) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rGI(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -77,7 +99,7 @@ function servercmdCM_Organizations_requestMembers(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 1) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rM(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -90,8 +112,10 @@ function servercmdCM_Organizations_requestMembers(%client, %id) {
 		%name = CM_Players.getData(%organization.members.value[%i].get("BLID")).name;
 		%jobID = %organization.members.value[%i].get("JobID");
 		%jobName = %organization.jobs.get(%organization.members.value[%i].get("JobID")).get("Name");
+		%hired = %organization.members.value[%i].get("Hired");
+		%infractions = %organization.members.value[%i].get("Infractions");
 
-		commandtoclient(%client, 'CM_Organizations_addMember', %bl_id, %name, %jobID, %jobName);
+		commandtoclient(%client, 'CM_Organizations_addMember', %bl_id, %name, %jobID, %jobName, %hired, %infractions);
 	}
 }
 
@@ -107,7 +131,7 @@ function servercmdCM_Organizations_requestJobModification(%client, %id, %jobID) 
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJM(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -119,7 +143,7 @@ function servercmdCM_Organizations_requestJobModification(%client, %id, %jobID) 
 
 	%job = %organization.jobs.get(%jobID);
 
-	commandtoclient(%client, 'CM_Organizations_setJobModification', %job.get("Name"), %job.get("Description"), $CM::Config::Organizations::MaxJobDescLength, %job.get("Salary"), $CM::Config::Organizations::MaxJobSalary, %job.get("Openings"), %job.get("Auto Accept"));
+	commandtoclient(%client, 'CM_Organizations_setJobModification', %job.get("Name"), %job.get("Description"), %job.get("Salary"), %job.get("Openings"), %job.get("Auto Accept"));
 }
 
 function servercmdCM_Organizations_requestJobs(%client, %id) {
@@ -130,19 +154,14 @@ function servercmdCM_Organizations_requestJobs(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 1) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJ(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
 
 	for(%i = 0; %i < %organization.jobs.keys.length; %i++) {
-		%values = %organization.jobs.values();
-
-		%name = %values.value[%i].get("Name");
-		%salary = %values.value[%i].get("Salary");
-		%tasksAmount = getWordCount(%values.value[%i].get("Tasks"));
-
-		commandtoclient(%client, 'CM_Organizations_addJob', %organization.jobs.keys.value[%i], %name, %salary, %tasksAmount);
+		%job = %organization.jobs.get(%organization.jobs.keys.value[%i]);
+		commandtoclient(%client, 'CM_Organizations_addJob', %organization.jobs.keys.value[%i], %job.get("Name"), %job.get("Salary"), %job.get("Tasks").length);
 	}
 }
 
@@ -154,7 +173,7 @@ function servercmdCM_Organizations_requestJobGroups(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 1) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJ(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -175,7 +194,7 @@ function servercmdCM_Organizations_requestJobSkills(%client, %id, %jobID) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJS(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -213,7 +232,7 @@ function servercmdCM_Organizations_requestJobTasks(%client, %id, %jobID) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 1) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJT(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -240,7 +259,7 @@ function servercmdCM_Organizations_requestInvitations(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 1) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rI(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -258,7 +277,7 @@ function servercmdCM_Organizations_requestApplications(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rA(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -266,10 +285,10 @@ function servercmdCM_Organizations_requestApplications(%client, %id) {
 	for(%i = 0; %i < %organization.applications.length; %i++) {
 		%application = %organization.applications.value[%i];
 		commandtoclient(%client, 'CM_Organizations_addApplication',
-			getField(%application, 0),
-			CM_Players.getData(getField(%application, 1)).name,
-			getField(%application, 1),
-			%organization.jobs.get(getField(%application, 1)).get("Name")
+			%application.get("BL_ID"),
+			CM_Players.getData(%application.get("BL_ID")).name,
+			%application.get("JobID"),
+			%organization.jobs.get(%application.get("JobID")).get("Name")
 		);
 	}
 }
@@ -282,7 +301,7 @@ function servercmdCM_Organizations_requestBalance(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rB(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -298,7 +317,7 @@ function servercmdCM_Organizations_requestLedger(%client, %id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rL(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -338,6 +357,23 @@ function servercmdCM_Organizations_createOrganization(%client, %name, %type) {
 	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You successfully created a" SPC properText(%type) SPC "Organization (ID #" @ %return @ ") by the name of" SPC %name @ "!");
 }
 
+function servercmdCM_Organizations_disbandOrganization(%client, %id) {
+	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_dO(1)", "INVALID_ID");
+		return;
+	}
+
+	%organization = CM_Organizations.getData(%id);
+
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 3) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_dO(2)", "INSUFFICIENT_PERMISSION");
+		return;
+	}
+
+	%organization.disband();
+	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "As of" SPC CM_Tick.getLongDate() @ ", the organization formerly known as" SPC %organization.name SPC "is now defunct.");
+}
+
 function servercmdCM_Organizations_joinOrganization(%client, %id) {
 	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_jO(1)", "INVALID_ID");
@@ -355,10 +391,28 @@ function servercmdCM_Organizations_joinOrganization(%client, %id) {
 		if(%organization.hasSentApplication(%client.bl_id)) {
 			commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You can't apply more than once to the same organization!");
 		} else {
-			// TO-DO (When adding criminal system, change "false" parameter to reflect if the player was a criminal or not)
 			%player = CM_Players.getData(%client.bl_id);
-			commandtoclient(%client, 'CM_Organizations_openApplicationForm', %organization.name, %player.name, false, Stringify::serialize(%player.skills));
+			commandtoclient(%client, 'CM_Organizations_viewAvailableJobs', %id, %organization.name, Stringify::serialize(CM_Players.getData(%client.bl_id).skills, true));
+
+			for(%i = 0; %i < %organization.jobs.keys.length; %i++) {
+				%job = %organization.jobs.get(%organization.jobs.keys.value[%i]);
+
+				if(%job.get("Openings") < 1) {
+					continue;
+				}
+
+				commandtoclient(%client, 'CM_Organizations_addAvailableJob', %job.get("Name"), %job.get("Description"), %job.get("Salary"), %job.get("Openings"), %job.get("Auto Accept"));
+
+				for(%i = 0; %i < %job.get("Prerequisites").length; %i++) {
+					%skillID = %job.get("Prerequisites").value[%i];
+					%skillset = getWord(strReplace(%skillID, ":", " "), 0);
+					%skill = getWord(strReplace(%skillID, ":", " "), 1);
+
+					commandtoclient(%client, 'CM_Organizations_addAvailableJobSkill', %skillID, CM_SkillsInfo.getSkillSetName(%skillset), CM_SkillsInfo.getSkillSet(%skillset).getRecord(%skill, "Name"));
+				}
+			}
 		}
+
 		return;
 	}
 
@@ -377,6 +431,33 @@ function servercmdCM_Organizations_joinOrganization(%client, %id) {
 
 	commandtoclient(%client, 'CM_Organizations_clearOrganizations');
 	servercmdCM_Organizations_requestOrganizations(%client);
+}
+
+function servercmdCM_Organizations_leaveOrganization(%client, %id) {
+	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_lO(1)", "INVALID_ID");
+		return;
+	}
+
+	%organization = CM_Organizations.getData(%id);
+
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_lO(2)", "INSUFFICIENT_PERMISSION");
+		return;
+	}
+
+	%return = %organization.kickMember(%client.bl_id);
+
+	if(firstWord(%return) $= "ERROR") {
+		switch$(getWord(%return, 1)) {
+			case "NONEXISTENT_MEMBER":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "A Member in this organization with the BL_ID of" SPC %client.bl_id SPC "does not exist!");
+				return;
+			default: commandtoclient(%client, 'CM_errorMessage', "CM_O_lO(3)", getWord(%return, 1)); return;
+		}
+	}
+
+	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You have left the organization," SPC %organization.name);
 }
 
 function servercmdCM_Organizations_sendApplication(%client, %id, %jobID) {
@@ -419,7 +500,7 @@ function servercmdCM_Organizations_editField(%client, %id, %field, %value) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_eF(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -486,7 +567,7 @@ function servercmdCM_Organizations_acceptApplication(%client, %id, %bl_id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_aA(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -516,7 +597,7 @@ function servercmdCM_Organizations_declineApplication(%client, %id, %bl_id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_dA(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -546,7 +627,7 @@ function servercmdCM_Organizations_sendInvitation(%client, %id, %bl_id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_sI(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -582,7 +663,7 @@ function servercmdCM_Organizations_revokeInvitation(%client, %id, %bl_id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rI(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -612,12 +693,11 @@ function servercmdCM_Organizations_createJob(%client, %id, %name, %description, 
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_cJ(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
 
-	%jobID = %organization.jobs.length;
 	%return = %organization.createJob(%name, %description, %salary, %openings, %autoaccept);
 
 	if(firstWord(%return) $= "ERROR") {
@@ -636,6 +716,8 @@ function servercmdCM_Organizations_createJob(%client, %id, %name, %description, 
 		}
 	}
 
+	%jobID = %organization.jobs.keys.value[%organization.jobs.keys.length];
+
 	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "A Job with the ID of \"" @ %jobID @ "\" and a name of \"" @ %name @ "\" has been created.");
 	commandtoclient(%client, 'CM_Organizations_addJob', %jobID, %name);
 	commandtoclient(%client, 'CM_Organizations_closeJobModification');
@@ -649,7 +731,7 @@ function servercmdCM_Organizations_updateJob(%client, %id, %jobID, %name, %descr
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_uJ(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -685,7 +767,7 @@ function servercmdCM_Organizations_deleteJob(%client, %id, %jobID) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_dJ(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -719,7 +801,7 @@ function servercmdCM_Organizations_addJobTask(%client, %id, %jobID, %taskID) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_aJT(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -758,7 +840,7 @@ function servercmdCM_Organizations_removeJobTask(%client, %id, %jobID, %taskID) 
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJT(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -786,26 +868,6 @@ function servercmdCM_Organizations_removeJobTask(%client, %id, %jobID, %taskID) 
 	commandtoclient(%client, 'CM_Organizations_removeOrganizationJobTask', %taskID);
 }
 
-function servercmdCM_Organizations_setJobSkillLevel(%client, %id, %jobID, %skill, %level) {
-	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
-		commandtoclient(%client, 'CM_errorMessage', "CM_O_sJSL(1)", "INVALID_ID");
-		return;
-	}
-
-	%organization = CM_Organizations.getData(%id);
-
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
-		commandtoclient(%client, 'CM_errorMessage', "CM_O_sJSL(2)", "INSUFFICIENT_PERMISSION");
-		return;
-	}
-
-	%return = %organization.editJobSkillLevel(%jobID, %skill, %level);
-
-	if(firstWord(%return) $= "ERROR") {
-		commandtoclient(%client, 'CM_errorMessage', "CM_O_sJSL(3)", getWord(%return, 1)); return;
-	}
-}
-
 function servercmdCM_Organizations_changeMemberJob(%client, %id, %bl_id, %jobID) {
 	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_cMJ(1)", "INVALID_ID");
@@ -814,7 +876,7 @@ function servercmdCM_Organizations_changeMemberJob(%client, %id, %bl_id, %jobID)
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_cMJ(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -855,7 +917,7 @@ function servercmdCM_Organizations_kickMember(%client, %id, %bl_id) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivelegeLevel(%client.bl_id) < 2) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_kM(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}

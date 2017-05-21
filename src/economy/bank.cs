@@ -27,7 +27,7 @@ datablock fxDTSBrickData(brickCMATMData) {
 // ============================================================
 function servercmdCM_Bank_requestCredentials(%client) {
 	%account = CM_Players.getData(%client.bl_id).account;
-	%pin = CM_Bank.getData(CM_Bank.resolveAccountNumber(%account)).pin;
+	%pin = CM_Bank.resolveAccountNumber(%account).pin;
 	commandtoclient(%client, 'CM_Bank_setCredentials', %account, %pin);
 }
 
@@ -45,7 +45,7 @@ function servercmdCM_Bank_requestBalance(%client, %account, %pin) {
 		return;
 	}
 
-	commandtoclient(%client, 'CM_Bank_setBalance', CM_Bank.getData(CM_Bank.resolveAccountNumber(%account)).balance);
+	commandtoclient(%client, 'CM_Bank_setBalance', CM_Bank.resolveAccountNumber(%account).balance);
 }
 
 function servercmdCM_Bank_requestLedger(%client, %account, %pin) {
@@ -54,14 +54,14 @@ function servercmdCM_Bank_requestLedger(%client, %account, %pin) {
 		return;
 	}
 
-	%ledger = CM_Bank.getData(CM_Bank.resolveAccountNumber(%account)).ledger;
+	%ledger = CM_Bank.resolveAccountNumber(%account).ledger;
 	for(%i = 0; %i < %ledger.length; %i++) {
 		%ledgeritem = %ledger.value[%i];
 		commandtoclient(%client, 'CM_Bank_addLedgerRecord', getField(%ledgeritem, 0), getField(%ledgeritem, 2), getField(%ledgeritem, 1));
 	}
 }
 
-function servercmdCM_Bank_depositAmount(%client, %account, %pin, %amount) {
+function servercmdCM_Bank_depositAll(%client, %account, %pin) {
 	if(!CM_Bank.verifyLogin(%account, %pin)) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_B_dA(1)", "INVALID_LOGIN");
 		return;
@@ -69,15 +69,162 @@ function servercmdCM_Bank_depositAmount(%client, %account, %pin, %amount) {
 
 	%inventory = CM_Players.getData(%client.bl_id).inventory;
 
+	%total = 0;
+
 	for(%y = 0; %y < %inventory.size["Y"]; %y++) {
 		for(%x = 0; %x < %inventory.size["X"]; %x++) {
-			%slot = %this.getSlot(%x, %y);
+			%slot = %inventory.getSlot(%x, %y);
 
 			if(%slot $= "") {
-				return %x SPC %y SPC false;
+				continue;
+			}
+
+			%name = %slot.get("Name");
+
+			if(%name $= CMHundredDollarItem.uiName) {
+				%total += 100 * %slot.get("Count");
+				%inventory.setSlot(%x, %y, "");
+			} else if(%name $= CMFiftyDollarItem.uiName) {
+				%total += 50 * %slot.get("Count");
+				%inventory.setSlot(%x, %y, "");
+			} else if(%name $= CMTwentyDollarItem.uiName) {
+				%total += 20 * %slot.get("Count");
+				%inventory.setSlot(%x, %y, "");
+			} else if(%name $= CMTenDollarItem.uiName) {
+				%total += 10 * %slot.get("Count");
+				%inventory.setSlot(%x, %y, "");
+			} else if(%name $= CMFiveDollarItem.uiName) {
+				%total += 5 * %slot.get("Count");
+				%inventory.setSlot(%x, %y, "");
+			} else if(%name $= CMOneDollarItem.uiName) {
+				%total += 1 * %slot.get("Count");
+				%inventory.setSlot(%x, %y, "");
 			}
 		}
 	}
+
+	if(%total == 0) {
+		commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You don't have any money to deposit");
+		return;
+	}
+
+	%return = CM_Bank.resolveAccountNumber(%account).addFunds(%total, "Deposit");
+
+	if(firstWord(%return) $= "ERROR") {
+		commandtoclient(%client, 'CM_errorMessage', "CM_B_dA(2)", getWord(%return, 1));
+		return;
+	}
+
+	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "Successfully deposited $" @ commaSeparateAmount(%total));
+}
+
+function servercmdCM_Bank_withdrawAmount(%client, %account, %pin, %amount) {
+	if(!CM_Bank.verifyLogin(%account, %pin)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_B_wA(1)", "INVALID_LOGIN");
+		return;
+	}
+
+	%return = CM_Bank.resolveAccountNumber(%account).removeFunds(%amount, "Withdrawal");
+
+	if(firstWord(%return) $= "ERROR") {
+		switch$(getWord(%return, 1)) {
+			case "INVALID_AMOUNT":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You must enter a valid amount to withdraw");
+				return;
+			case "INSUFFICIENT_FUNDS":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You do not have enough funds to withdraw the specified amount!");
+				return;
+			default: commandtoclient(%client, 'CM_errorMessage', "CM_B_wA(2)", getWord(%return, 1)); return;
+		}
+	}
+
+	%totali = %amount;
+
+	// Hundreds
+	%hundreds = mFloor(%amount / 100);
+	%amount -= %hundreds * 100;
+
+	// Fifties
+	%fifties = mFloor(%amount / 50);
+	%amount -= %fifties * 50;
+
+	// Twenties
+	%twenties = mFloor(%amount / 20);
+	%amount -= %twenties * 20;
+
+	// Tens
+	%tens = mFloor(%amount / 10);
+	%amount -= %tens * 10;
+
+	// Fives
+	%fives = mFloor(%amount / 5);
+	%amount -= %fives * 5;
+
+	// Ones
+	%ones = mFloor(%amount / 1);
+	%amount -= %ones * 1;
+
+	%totalf = (%hundreds * 100) + (%fifties * 50) + (%twenties * 20) + (%tens * 10) + (%fives * 5) + (%ones * 1);
+
+	if(%totali != %totalf) {
+		// Houston, we have a problem
+		CMError(1, "servercmdCM_Bank_withdrawAmount() ==> Amount calculated does not equal amount desired (" @ %totalf SPC "!=" SPC %totali @ ")");
+		return;
+	}
+
+	%inventory = CM_Players.getData(%client.bl_id).inventory;
+
+	if(%hundreds != 0) {
+		%inventory.addItem("ITEM", CMHundredDollarItem.uiName, CMHundredDollarItem, %hundreds);
+	}
+
+	if(%fifties != 0) {
+		%inventory.addItem("ITEM", CMFiftyDollarItem.uiName, CMFiftyDollarItem, %fifties);
+	}
+
+	if(%twenties != 0) {
+		%inventory.addItem("ITEM", CMTwentyDollarItem.uiName, CMTwentyDollarItem, %twenties);
+	}
+
+	if(%tens != 0) {
+		%inventory.addItem("ITEM", CMTenDollarItem.uiName, CMTenDollarItem, %tens);
+	}
+
+	if(%fives != 0) {
+		%inventory.addItem("ITEM", CMFiveDollarItem.uiName, CMFiveDollarItem, %fives);
+	}
+
+	if(%ones != 0) {
+		%inventory.addItem("ITEM", CMOneDollarItem.uiName, CMOneDollarItem, %ones);
+	}
+
+	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "Successfully withdrew $" @ commaSeparateAmount(%totalf));
+}
+
+function servercmdCM_Bank_transferAmount(%client, %account, %pin, %amount, %recipient) {
+	if(!CM_Bank.verifyLogin(%account, %pin)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_B_tA(1)", "INVALID_LOGIN");
+		return;
+	}
+
+	%return = CM_Bank.resolveAccountNumber(%account).transferFunds(%recipient, %amount);
+
+	if(firstWord(%return) $= "ERROR") {
+		switch$(getWord(%return, 1)) {
+			case "INVALID_AMOUNT":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You must enter a valid amount to transfer");
+				return;
+			case "INVALID_RECIPIENT":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "An account with the given account number does not exist");
+				return;
+			case "INSUFFICIENT_FUNDS":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You do not have enough funds to transfer the specified amount!");
+				return;
+			default: commandtoclient(%client, 'CM_errorMessage', "CM_B_tA(2)", getWord(%return, 1)); return;
+		}
+	}
+
+	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "Successfully transferred $" @ commaSeparateAmount(%amount) SPC "to account #" @ %recipient);
 }
 
 // ============================================================
@@ -85,22 +232,22 @@ function servercmdCM_Bank_depositAmount(%client, %account, %pin, %amount) {
 // ============================================================
 function CM_Bank::registerAccount(%this, %type, %owner) {
 	if(!strLen(%owner)) {
-		warn("CM_Bank::createOrganization() ==> Invalid \"%owner\" given -- cannot be blank");
+		CMError(2, "CM_Bank::registerAccount() ==> Invalid \"%owner\" given -- cannot be blank");
 		return "ERROR INVALID_OWNER";
 	}
 
 	if(%type $= "player") {
 		if(!CM_Players.dataExists(%owner)) {
-			warn("CM_Bank::createOrganization() ==> A player by the ID of \"" @ %owner @ "\" does not exist");
+			CMError(2, "CM_Bank::registerAccount() ==> A player by the ID of \"" @ %owner @ "\" does not exist");
 			return "ERROR OWNER_DOES_NOT_EXIST";
 		}
 	} else if(%type $= "organization") {
 		if(!CM_Organizations.dataExists(%owner)) {
-			warn("CM_Bank::createOrganization() ==> An organization by the ID of \"" @ %owner @ "\" does not exist");
+			CMError(2, "CM_Bank::registerAccount() ==> An organization by the ID of \"" @ %owner @ "\" does not exist");
 			return "ERROR OWNER_DOES_NOT_EXIST";
 		}
 	} else {
-		warn("CM_Bank::createOrganization() ==> Invalid \"%type\" given -- must be either \"player\" or \"organization\"");
+		CMError(2, "CM_Bank::registerAccount() ==> Invalid \"%type\" given -- must be either \"player\" or \"organization\"");
 		return "ERROR INVALID_TYPE";
 	}
 
@@ -118,14 +265,18 @@ function CM_Bank::registerAccount(%this, %type, %owner) {
 	return %account.number;
 }
 
+function CM_Bank::closeAccount(%this) {
+
+}
+
 function CM_Bank::generateAccountNumber(%this, %type, %id) {
 	if(!strLen(%type) || ((%type !$= "player") && (%type !$= "organization"))) {
-		warn("CM_Bank::generateAccountNumber() ==> Invalid \"%type\" given -- must be either \"player\" or \"organization\"");
+		CMError(2, "CM_Bank::generateAccountNumber() ==> Invalid \"%type\" given -- must be either \"player\" or \"organization\"");
 		return "ERROR INVALID_ID";
 	}
 
 	if(!strLen(%id) || !isNumber(%id)) {
-		warn("CM_Bank::generateAccountNumber() ==> Invalid \"%id\" given -- must be an integer");
+		CMError(2, "CM_Bank::generateAccountNumber() ==> Invalid \"%id\" given -- must be an integer");
 		return "ERROR INVALID_ID";
 	}
 
@@ -161,7 +312,7 @@ function CM_Bank::resolveAccountNumber(%this, %number) {
 	}
 
 	for(%i = 0; %i < %this.dataTable.keys.length; %i++) {
-		if(%this.dataTable.get(%account = %this.dataTable.keys.value[%i]).number $= %number) {
+		if((%account = %this.dataTable.get(%this.dataTable.keys.value[%i])).number $= %number) {
 			return %account;
 		}
 	}
@@ -173,8 +324,6 @@ function CM_Bank::verifyLogin(%this, %account, %pin) {
 	%account = %this.resolveAccountNumber(%account);
 
 	if(%account != -1) {
-		%account = %this.getData(%account);
-
 		if(%account.pin == %pin) {
 			return true;
 		}
@@ -188,8 +337,8 @@ function CityModBankAccount::addLedgerItem(%this, %amount, %message) {
 }
 
 function CityModBankAccount::addFunds(%this, %amount, %message) {
-	if(!strLen(%amount) || !isNumber(%number)) {
-		warn("CityModBankAccount::addFunds() ==> Invalid \"%amount\" given -- cannot be blank");
+	if(!strLen(%amount) || !isNumber(%amount) || (%amount == 0)) {
+		CMError(2, "CityModBankAccount::addFunds() ==> Invalid \"%amount\" given -- cannot be blank");
 		return "ERROR INVALID_AMOUNT";
 	}
 
@@ -204,17 +353,17 @@ function CityModBankAccount::addFunds(%this, %amount, %message) {
 }
 
 function CityModBankAccount::removeFunds(%this, %amount, %message) {
-	if(!strLen(%amount) || !isNumber(%number)) {
-		warn("CityModBankAccount::removeFunds() ==> Invalid \"%amount\" given -- cannot be blank");
+	if(!strLen(%amount) || !isNumber(%amount) || (%amount == 0)) {
+		CMError(2, "CityModBankAccount::removeFunds() ==> Invalid \"%amount\" given -- cannot be blank");
 		return "ERROR INVALID_AMOUNT";
 	}
 
-	if(%this.balance <= 0) {
-		warn("CityModBankAccount::removeFunds() ==> Cannot remove funds from an account that does not have any");
-		return "ERROR BANKRUPT";
-	}
-
 	%amount = mAbs(%amount);
+
+	if(%amount > %this.balance) {
+		CMError(2, "CityModBankAccount::removeFunds() ==> Account does not have the sufficient funds");
+		return "ERROR INSUFFICIENT_FUNDS";
+	}
 
 	if(!strLen(%message)) {
 		%message = "Generic Transaction";
@@ -225,20 +374,20 @@ function CityModBankAccount::removeFunds(%this, %amount, %message) {
 }
 
 function CityModBankAccount::transferFunds(%this, %recipient, %amount, %message) {
-	if(!strLen(%amount) || !isNumber(%number)) {
-		warn("CityModBankAccount::transferFunds() ==> Invalid \"%amount\" given -- cannot be blank");
+	if(!strLen(%amount) || !isNumber(%amount) || (%amount == 0)) {
+		CMError(2, "CityModBankAccount::transferFunds() ==> Invalid \"%amount\" given -- cannot be blank");
 		return "ERROR INVALID_AMOUNT";
 	}
 
-	if((%recipientAccount = CM_Bank.resolveAccountNumber(%recipient)) $= "") {
-		warn("CityModBankAccount::transferFunds() ==> Recipient account does not exist");
+	if((%recipientAccount = CM_Bank.resolveAccountNumber(%recipient)) == -1) {
+		CMError(2, "CityModBankAccount::transferFunds() ==> Recipient account does not exist");
 		return "ERROR INVALID_RECIPIENT";
 	}
 
 	%amount = mAbs(%amount);
 
 	if(%amount > %this.balance) {
-		warn("CityModBankAccount::transferFunds() ==> Source account does not have the sufficient funds");
+		CMError(2, "CityModBankAccount::transferFunds() ==> Source account does not have the sufficient funds");
 		return "ERROR INSUFFICIENT_FUNDS";
 	}
 
@@ -246,10 +395,10 @@ function CityModBankAccount::transferFunds(%this, %recipient, %amount, %message)
 		%message = "Funds Transfer";
 	}
 
-	%this.removeFunds(%amount, "Funds Transfer (" @ %recipient @ ")");
-	CM_Bank.getData(%recipientAccount).addFunds(%amount, "Funds Transfer (" @ %this.number @ ")");
+	%this.removeFunds(%amount, "Transfer (" @ %recipient @ ")");
+	%recipientAccount.addFunds(%amount, "Transfer (" @ %this.number @ ")");
 }
 
 function CityModPlayer::getBankAccount(%this) {
-	return CM_Bank.getData(CM_Bank.resolveAccountNumber(%this.account));
+	return CM_Bank.resolveAccountNumber(%this.account);
 }

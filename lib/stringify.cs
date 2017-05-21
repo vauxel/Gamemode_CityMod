@@ -3,9 +3,31 @@
 // Description      -      Data Serialization and Parsing
 // ============================================================
 
-function Stringify::serialize(%data, %type) {
+function Stringify::getIndentString(%indent) {
+	%string = "";
+
+	for(%i = 0; %i < %indent; %i++) {
+		%string = %string @ "\t";
+	}
+
+	return %string;
+}
+
+function Stringify::serialize(%data, %compact, %type, %indent) {
+	if(%compact $= "") {
+		%compact = true;
+	}
+
 	if(%type $= "") {
 		%type = Stringify::interpretDataType(%data);
+	}
+
+	if(!%compact) {
+		if(%indent $= "") {
+			%indent = 0;
+		}
+
+		%indentString = Stringify::getIndentString(%indent);
 	}
 
 	switch$(%type) {
@@ -13,26 +35,34 @@ function Stringify::serialize(%data, %type) {
 		case "string": return "\"" @ expandEscape(expandEscape(%data)) @ "\"";
 		case "number": return %data > 0 ? "+" @ %data : %data;
 		case "bool": return %data ? "true" : "false";
-		case "map":
-			for(%i = 0; %i < %data.keys.length; %i++) {
-				%map = %map @ Stringify::serialize(%data.keys.value[%i], "string") SPC "=" SPC Stringify::serialize(%data.get(%data.keys.value[%i]));
-
-				if(%i != (%data.keys.length - 1)) {
-					%map = %map @ ", ";
-				}
+		case "array":
+			if(%data.length == 0) {
+				return "[ ]";
 			}
 
-			return "map:{" @ %map @ "}";
-		case "array":
 			for(%i = 0; %i < %data.length; %i++) {
-				%array = %array @ Stringify::serialize(%data.value[%i]);
+				%array = %array @ (%compact ? "" : %indentString @ "\t") @ Stringify::serialize(%data.value[%i], %compact, "", %indent + 1);
 
 				if(%i != (%data.length - 1)) {
-					%array = %array @ ", ";
+					%array = %array @ (%compact ? ", " : ",\n");
 				}
 			}
 
-			return "array:{" @ %array @ "}";
+			return "[" @ (%compact ? "" : "\n") @ %array @ (%compact ? "" : "\n" @ %indentString) @ "]";
+		case "map":
+			if(%data.keys.length == 0) {
+				return "{ }";
+			}
+
+			for(%i = 0; %i < %data.keys.length; %i++) {
+				%map = %map @ (%compact ? "" : %indentString @ "\t") @ Stringify::serialize(%data.keys.value[%i], true, "string") SPC "=" SPC Stringify::serialize(%data.get(%data.keys.value[%i]), %compact, "", %indent + 1);
+
+				if(%i != (%data.keys.length - 1)) {
+					%map = %map @ (%compact ? ", " : ",\n");
+				}
+			}
+
+			return "{" @ (%compact ? "" : "\n") @ %map @ (%compact ? "" : "\n" @ %indentString) @ "}";
 		case "object":
 			switch$(%data.getClassName()) {
 				case "SimObject": %objectType = "SO";
@@ -42,27 +72,31 @@ function Stringify::serialize(%data, %type) {
 				case "ScriptGroup": %objectType = "sg";
 			}
 
+			%tags = "<!" @ %objectType @ ">";
+
 			if(strLen(%data.class)) {
-				%object = (%object !$= "" ? (%object @ ", ") : "") @ "class = " @ Stringify::serialize(%data.class, "string");
+				%tags = %tags @ "<#" @ %data.class @ ">";
 			}
 
 			if(strLen(%data.getName())) {
-				%object = (%object !$= "" ? (%object @ ", ") : "") @ "name = " @ Stringify::serialize(%data.getName(), "string");
+				%tags = %tags @ "<@" @ %data.getName() @ ">";
 			}
 
 			if(%data.getTaggedField(0) $= "") {
-				return "object[" @ %objectType @ "]:{" @ %object @ "}";
+				return "(" @ %tags @ ")";
 			}
 
 			%fieldIndex = 0;
 			while((%field = %data.getTaggedField(%fieldIndex)) !$= "") {
-				%fields = %fields @ ((%fieldIndex != 0) ? ", " : "") @ Stringify::serialize(getField(%field, 0), "string") SPC "=" SPC Stringify::serialize(getFields(%field, 1));
+				if(%fieldIndex != 0) {
+					%object = %object @ (%compact ? ", " : ",\n");
+				}
+
+				%object = %object @ (%compact ? "" : %indentString @ "\t") @ Stringify::serialize(getField(%field, 0), true, "string") SPC "=" SPC Stringify::serialize(getFields(%field, 1), %compact, "", %indent + 1);
 				%fieldIndex++;
 			}
 
-			%object = (%object !$= "" ? (%object @ ", ") : "") @ "fields = " @ "{" @ %fields @ "}";
-
-			return "object[" @ %objectType @ "]:{" @ %object @ "}";
+			return "(" @ %tags @ (%compact ? " " : "\n") @ %object @ (%compact ? "" : "\n" @ %indentString) @ ")";
 		default:
 			CMError(1, "Stringify::serialize", "Could not serialize type \"" @ %type @ "\" given");
 			return "";
@@ -78,6 +112,10 @@ function Stringify::interpretDataType(%value) {
 		return "bool";
 	}
 
+	if(isNumber(%value)) {
+		return "number";
+	}
+
 	if(isExplicitObject(%value)) {
 		if(isMapObject(%value)) {
 			return "map";
@@ -88,10 +126,6 @@ function Stringify::interpretDataType(%value) {
 		}
 
 		return "object";
-	}
-
-	if(isNumber(%value)) {
-		return "number";
 	}
 
 	return "string";
@@ -127,24 +161,8 @@ function Stringify::interpretType() {
 		return "null";
 	}
 
-	if((getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 4) $= "true") ||
-		(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 5) $= "false")) {
+	if((getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 4) $= "true") || (getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 5) $= "false")) {
 		return "bool";
-	}
-
-	if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 6) $= "object") {
-		$Stringify::currentStringIndex += 6;
-		return "object";
-	}
-
-	if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 6) $= "array:") {
-		$Stringify::currentStringIndex += 6;
-		return "array";
-	}
-
-	if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 4) $= "map:") {
-		$Stringify::currentStringIndex += 4;
-		return "map";
 	}
 
 	%firstChar = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1);
@@ -155,6 +173,18 @@ function Stringify::interpretType() {
 
 	if((%firstChar $= "+") || (%firstChar $= "-") || isNumber(%firstChar)) {
 		return "number";
+	}
+
+	if(%firstChar $= "[") {
+		return "array";
+	}
+
+	if(%firstChar $= "{") {
+		return "map";
+	}
+
+	if(%firstChar $= "(") {
+		return "object";
 	}
 }
 
@@ -180,14 +210,14 @@ function Stringify::parseType(%type) {
 
 			for(%i = $Stringify::currentStringIndex; %i < %strLen; %i++) {
 				if((getSubStr($Stringify::currentString, %i, 1) $= "\"") && (getSubStr($Stringify::currentString, %i - 1, 1) !$= "\\")) {
-					%endIndex = %i - 1; // Set the end pos to right before the '\"' character
+					%endIndex = %i - 1;
 					break;
 				}
 			}
 
 			%length = (%endIndex - $Stringify::currentStringIndex) + 1;
 			%string = collapseEscape(collapseEscape(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, %length)));
-			$Stringify::currentStringIndex = (%endIndex + 2); // 1 to skip the '\"' character and another 1 to set the index to after the string
+			$Stringify::currentStringIndex = %endIndex + 2;
 
 			return %string;
 		case "number":
@@ -225,9 +255,36 @@ function Stringify::parseType(%type) {
 
 			%length = (%endIndex - $Stringify::currentStringIndex) + 1;
 			%number = (%isNegative == true ? "-" : "") @ getSubStr($Stringify::currentString, $Stringify::currentStringIndex, %length);
-			$Stringify::currentStringIndex = (%endIndex + 1);
+			$Stringify::currentStringIndex = %endIndex + 1;
 
 			return %number;
+		case "array":
+			if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "[") {
+				CMError(1, "Stringify::parseType", "Parsing \"array\", no object-start char ('[') found");
+				return "";
+			}
+
+			$Stringify::currentStringIndex++;
+			%array = Array();
+
+			while(true) {
+				Stringify::skipWhitespace();
+				%firstChar = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1);
+
+				if(%firstChar $= ",") {
+					$Stringify::currentStringIndex++;
+					continue;
+				}
+
+				if(%firstChar $= "]") {
+					$Stringify::currentStringIndex++;
+					break;
+				}
+
+				%array.push(Stringify::parseType(Stringify::interpretType()));
+			}
+
+			return %array;
 		case "map":
 			if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "{") {
 				CMError(1, "Stringify::parseType", "Parsing \"map\", no object-start char ('{') found");
@@ -267,126 +324,67 @@ function Stringify::parseType(%type) {
 			}
 
 			return %map;
-		case "array":
-			if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "{") {
-				CMError(1, "Stringify::parseType", "Parsing \"array\", no object-start char ('{') found");
-				return "";
-			}
-
-			$Stringify::currentStringIndex++;
-			%array = Array();
-
-			while(true) {
-				Stringify::skipWhitespace();
-				%firstChar = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1);
-
-				if(%firstChar $= ",") {
-					$Stringify::currentStringIndex++;
-					continue;
-				}
-
-				if(%firstChar $= "}") {
-					$Stringify::currentStringIndex++;
-					break;
-				}
-
-				%array.push(Stringify::parseType(Stringify::interpretType()));
-			}
-
-			return %array;
 		case "object":
-			if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "[") {
-				CMError(1, "Stringify::parseType", "Parsing \"object\", no object-type char ('[') found -- defaulting to SimObject");
-				%objectType = "SimObject";
-			} else {
-				$Stringify::currentStringIndex++;
-				%objectType = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 2);
-
-				if(strCmp(%objectType, "SO") == 0) {
-					%objectType = "SimObject";
-				} else if(strCmp(%objectType, "SG") == 0) {
-					%objectType = "SimGroup";
-				} else if(strCmp(%objectType, "SS") == 0) {
-					%objectType = "SimSet";
-				} else if(strCmp(%objectType, "so") == 0) {
-					%objectType = "ScriptObject";
-				} else if(strCmp(%objectType, "sg") == 0) {
-					%objectType = "ScriptGroup";
-				} else {
-					CMError(1, "Stringify::parseType", "Parsing \"object\", object-type \"" @ %objectType @ "\" not recognized -- defaulting to SimObject");
-					%objectType = "SimObject";
-				}
-
-				$Stringify::currentStringIndex += 2;
-				$Stringify::currentStringIndex++;
-			}
-
-			$Stringify::currentStringIndex++;
-
-			if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "{") {
-				CMError(1, "Stringify::parseType", "Parsing \"" @ %type @ "\", no object-start char ('{') found");
+			if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "(") {
+				CMError(1, "Stringify::parseType", "Parsing \"object\", no object-start char ('(') found");
 				return "";
 			}
 
 			$Stringify::currentStringIndex++;
 
-			%objectName = "";
+			%objectType = "";
 			%objectClass = "";
-			%objectFields = "";
+			%objectName = "";
 
-			while(true) {
-				Stringify::skipWhitespace();
-				%firstChar = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1);
+			while(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) $= "<") {
+				$Stringify::currentStringIndex++;
 
-				if(%firstChar $= ",") {
+				%tagChar = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1);
+
+				if(%tagChar $= "!") {
 					$Stringify::currentStringIndex++;
-					continue;
-				}
+					%objectType = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 2);
 
-				if(%firstChar $= "}") {
+					if(strCmp(%objectType, "SO") == 0) {
+						%objectType = "SimObject";
+					} else if(strCmp(%objectType, "SG") == 0) {
+						%objectType = "SimGroup";
+					} else if(strCmp(%objectType, "SS") == 0) {
+						%objectType = "SimSet";
+					} else if(strCmp(%objectType, "so") == 0) {
+						%objectType = "ScriptObject";
+					} else if(strCmp(%objectType, "sg") == 0) {
+						%objectType = "ScriptGroup";
+					} else {
+						CMError(1, "Stringify::parseType", "Parsing \"object\", object-type \"" @ %objectType @ "\" not recognized -- defaulting to SimObject");
+						%objectType = "SimObject";
+					}
+
+					$Stringify::currentStringIndex += 2;
+				} else if((%tagChar $= "#") || (%tagChar $= "@")) {
 					$Stringify::currentStringIndex++;
-					break;
-				}
 
-				if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 4) $= "name") {
-					$Stringify::currentStringIndex += 4;
-					%parameter = 1;
-				}
+					for(%i = $Stringify::currentStringIndex; %i < %strLen; %i++) {
+						if(getSubStr($Stringify::currentString, %i, 1) $= ">") {
+							%endIndex = %i - 1;
+							break;
+						}
+					}
 
-				if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 5) $= "class") {
-					$Stringify::currentStringIndex += 5;
-					%parameter = 2;
-				}
+					if(%tagChar $= "#") {
+						%objectClass = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, (%endIndex - $Stringify::currentStringIndex) + 1);
+					} else if(%tagChar $= "@") {
+						%objectName = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, (%endIndex - $Stringify::currentStringIndex) + 1);
+					}
 
-				if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 6) $= "fields") {
-					$Stringify::currentStringIndex += 6;
-					%parameter = 3;
-				}
-
-				if(%parameter $= "") {
-					CMError(1, "Stringify::parseType", "Parsing \"" @ %type @ "\", no matching parameter found");
-					return "";
-				}
-
-				Stringify::skipWhitespace();
-
-				if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "=") {
-					CMError(1, "Stringify::parseType", "Parsing \"" @ %type @ "\", no set delimeter ('=') found");
-					return "";
+					$Stringify::currentStringIndex = %endIndex + 1;
 				}
 
 				$Stringify::currentStringIndex++;
-				Stringify::skipWhitespace();
-
-				switch(%parameter) {
-					case 1: %objectName = Stringify::parseType("string");
-					case 2: %objectClass = Stringify::parseType("string");
-					case 3: %objectFields = Stringify::parseType("map");
-				}
 			}
 
-			if(isObject(%objectName)) {
-				CMError(1, "Stringify::parseType", "Parsing \"" @ %type @ "\", ScriptObject by the name of \"" @ %objectName @ "\" already exists");
+			if((%objectName !$= "") && isObject(%objectName)) {
+				CMError(1, "Stringify::parseType", "Parsing \"object\", " @ %objectType @ " by the name of \"" @ %objectName @ "\" already exists");
 				return "";
 			}
 
@@ -396,14 +394,33 @@ function Stringify::parseType(%type) {
 				%tempSO.class = %objectClass;
 			}
 
-			if((%objectFields !$= "") && isExplicitObject(%objectFields)) {
-				for(%i = 0; %i < %objectFields.keys.length; %i++) {
-					%tempSO.setAttribute(%objectFields.keys.value[%i], %objectFields.get(%objectFields.keys.value[%i]));
+			while(true) {
+				Stringify::skipWhitespace();
+				%firstChar = getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1);
+
+				if(%firstChar $= ",") {
+					$Stringify::currentStringIndex++;
+					continue;
 				}
 
-				// This is an example of what NOT to do...
-				%objectFields.keys.length = 0;
-				%objectFields.delete();
+				if(%firstChar $= ")") {
+					$Stringify::currentStringIndex++;
+					break;
+				}
+
+				%name = Stringify::parseType("string");
+				Stringify::skipWhitespace();
+
+				if(getSubStr($Stringify::currentString, $Stringify::currentStringIndex, 1) !$= "=") {
+					CMError(1, "Stringify::parseType", "Parsing \"object\", no set delimeter ('=') found");
+					%tempSO.delete();
+					return "";
+				}
+
+				$Stringify::currentStringIndex++;
+				Stringify::skipWhitespace();
+
+				%tempSO.setAttribute(%name, Stringify::parseType(Stringify::interpretType()));
 			}
 
 			%object = %tempSO.copy();

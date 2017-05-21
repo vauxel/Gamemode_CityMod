@@ -68,6 +68,7 @@ $CM::ModuleList = (
 	"items" TAB
 	"inventory" TAB
 	"economy" TAB
+	"production" TAB
 	"organizations" TAB
 	"realestate" TAB
 	"player"

@@ -42,7 +42,7 @@ datablock ItemData(CMOneDollarItem) {
 	friction = 0.6;
 	emap = true;
 
-	uiName = "$1 Bill";
+	uiName = "$1";
 	iconName = "";
 	doColorShift = true;
 	colorShiftColor = "0.0 0.501 0.0 1.0";
@@ -126,7 +126,7 @@ datablock ShapeBaseImageData(CMOneDollarImage) {
 // ------------------------------------------------------------
 datablock ItemData(CMFiveDollarItem : CMOneDollarItem) {
 	shapeFile = $CM::Config::Path::Mod @ "res/items/Money/Five/MoneyH.dts";
-	uiName = "$5 Bill";
+	uiName = "$5";
 
 	image = CMFiveDollarImage;
 	monetaryValue = 5;
@@ -151,7 +151,7 @@ datablock ShapeBaseImageData(CMFiveDollarImage : CMOneDollarImage) {
 // ------------------------------------------------------------
 datablock ItemData(CMTenDollarItem : CMOneDollarItem) {
 	shapeFile = $CM::Config::Path::Mod @ "res/items/Money/Ten/MoneyH.dts";
-	uiName = "$10 Bill";
+	uiName = "$10";
 
 	image = CMTenDollarImage;
 	monetaryValue = 10;
@@ -171,16 +171,12 @@ datablock ShapeBaseImageData(CMTenDollarImage : CMOneDollarImage) {
 // Section 4 - Twenty Dollar Datablocks
 // ============================================================
 
-function CMTwentyDollarImage::onFire(%this, %player, %slot) {
-	CMOneDollarImage::onFire(%this, %player, %slot);
-}
-
 // ------------------------------------------------------------
 // Section 4.1 - Item Datablock
 // ------------------------------------------------------------
 datablock ItemData(CMTwentyDollarItem : CMOneDollarItem) {
 	shapeFile = $CM::Config::Path::Mod @ "res/items/Money/Twenty/MoneyH.dts";
-	uiName = "$20 Bill";
+	uiName = "$20";
 
 	image = CMTwentyDollarImage;
 	monetaryValue = 20;
@@ -205,7 +201,7 @@ datablock ShapeBaseImageData(CMTwentyDollarImage : CMOneDollarImage) {
 // ------------------------------------------------------------
 datablock ItemData(CMFiftyDollarItem : CMOneDollarItem) {
 	shapeFile = $CM::Config::Path::Mod @ "res/items/Money/Fifty/MoneyH.dts";
-	uiName = "$50 Bill";
+	uiName = "$50";
 
 	image = CMFiftyDollarImage;
 	monetaryValue = 50;
@@ -230,7 +226,7 @@ datablock ShapeBaseImageData(CMFiftyDollarImage : CMOneDollarImage) {
 // ------------------------------------------------------------
 datablock ItemData(CMHundredDollarItem : CMOneDollarItem) {
 	shapeFile = $CM::Config::Path::Mod @ "res/items/Money/Hundred/MoneyH.dts";
-	uiName = "$100 Bill";
+	uiName = "$100";
 
 	image = CMHundredDollarImage;
 	monetaryValue = 100;
@@ -250,22 +246,7 @@ datablock ShapeBaseImageData(CMHundredDollarImage : CMOneDollarImage) {
 // Section 7 - Functions
 // ============================================================
 function CMOneDollarImage::onFire(%this, %player, %slot) {
-	%start = %player.getEyePoint();
-	%vec = vectorScale(%player.getMuzzleVector(%slot), getWord(%player.getScale(), 2) * 10);
-	%end = vectorAdd(%start, %vec);
-	%mask = $TypeMasks::FxBrickObjectType;
-
-	%rayCast = containerRayCast(%start, %end, %mask);
-
-	if(!%rayCast) {
-		return;
-	}
-
-	%hitObj = getWord(%rayCast, 0);
-	%hitPos = getWords(%rayCast, 1, 3);
-	%hitNormal = getWords(%rayCast, 4, 6);
-
-	warn(%this.getName() @ "::onFire [" @ %hitObj SPC %hitPos SPC %hitNormal @ "]");
+	// Do nothing
 }
 
 function CMFiveDollarImage::onFire(%this, %player, %slot) {

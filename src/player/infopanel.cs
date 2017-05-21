@@ -11,7 +11,7 @@ function CityModPlayer::updateStats(%this, %client) {
 	%stats = Array();
 	%stats.push("BLID" TAB %this.blid); // For testing
 
-	%statsString = Stringify::serialize(%stats, "array");
+	%statsString = Stringify::serialize(%stats, true, "array");
 	%stats.delete();
 
 	commandtoclient(%client, 'CM_Infopanel_updateName', %this.name);
@@ -31,7 +31,7 @@ function servercmdCM_Infopanel_requestSkillsets(%client) {
 		%skillsets.push(CM_SkillsInfo.skillsets.get(%skillset) TAB %playerData.getLevel(%skillset) TAB (%playerData.getXPPercent(%skillset)));
 	}
 
-	commandtoclient(%client, 'CM_Infopanel_updateSkillsets', Stringify::serialize(%skillsets, "array"));
+	commandtoclient(%client, 'CM_Infopanel_updateSkillsets', Stringify::serialize(%skillsets, true, "array"));
 	%skillsets.delete();
 }
 

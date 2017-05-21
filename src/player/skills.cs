@@ -90,6 +90,10 @@ function CM_SkillsInfo::getSkillSet(%this, %name) {
 	return %this.getAttribute(%name);
 }
 
+function CM_SkillsInfo::getSkillSetName(%this, %name) {
+	return %this.skillsets.get(%name);
+}
+
 function CM_SkillsInfo::getSkillSetByName(%this, %name) {
 	for(%i = 0; %i < %this.skillsets.keys.length; %i++) {
 		if(%this.skillsets.get(%skillset = %this.skillsets.keys.value[%i]) $= %name) {
@@ -108,6 +112,29 @@ function CM_SkillsInfo::skillSetNameExists(%this, %name) {
 	return (%skillset !$= "") && isObject(%skillset);
 }
 
+function CM_SkillsInfo::skillIDExists(%this, %skillID) {
+	if(strPos(%skillID, ":") == -1) {
+		return "";
+	}
+
+	%skillset = getWord(strReplace(%skillID, ":", " "), 0);
+	%skill = getWord(strReplace(%skillID, ":", " "), 1);
+
+	if(!strLen(%skillset) || !strLen(%skill)) {
+		return false;
+	}
+
+	if(!CM_SkillsInfo.skillSetExists(%skillset)) {
+		return false;
+	}
+
+	if(!CM_SkillsInfo.getSkillSet(%skillset).recordExists(%skill)) {
+		return false;
+	}
+
+	return true;
+}
+
 function CM_SkillsInfo::addSkillSet(%this, %rawname, %name) {
 	if(%this.skillSetExists(%rawname)) {
 		return;
@@ -118,21 +145,6 @@ function CM_SkillsInfo::addSkillSet(%this, %rawname, %name) {
     class = "CityModInfoDB";
     path = $CM::Config::Path::Mod @ "res/info/skills/" @ %rawname;
   });
-}
-
-function CM_SkillsInfo::getSkillIDFromName(%this, %name) {
-	for(%i = 0; %i < %this.skillsets.keys.length; %i++) {
-		%skillset = %this.getSkillSet(%skillsetID = %this.skillsets.keys.value[%i]);
-
-		%index = 1;
-		while((%skill = %skillset.getRecord("order", %index)) !$= "") {
-			if(%skillset.getRecord(%skill, "Name") $= %name) {
-				return (%skillsetID SPC %index);
-			}
-
-			%index++;
-		}
-	}
 }
 
 // ============================================================

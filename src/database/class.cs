@@ -209,9 +209,26 @@ function CityModDatabase::loadData(%this, %id) {
 
 	%data = %this.createDataSO();
 
+	%currentField["name"] = "";
+	%currentField["data"] = "";
+
 	while(!%file.isEOF()) {
 		%line = %file.readLine();
-		%data.setAttribute(getField(%line, 0), Stringify::parse(getFields(%line, 1)));
+
+		if(getSubStr(%line, 0, 1) $= "#") {
+			if(%currentField["name"] !$= "") {
+				%data.setAttribute(%currentField["name"], Stringify::parse(%currentField["data"]));
+			}
+
+			%currentField["name"] = getField(getSubStr(%line, 1, strLen(%line) - 1), 0);
+			%currentField["data"] = getFields(%line, 1);
+		} else {
+			%currentField["data"] = %currentField["data"] @ %line;
+		}
+
+		if(%file.isEOF()) {
+			%data.setAttribute(%currentField["name"], Stringify::parse(%currentField["data"]));
+		}
 	}
 
 	%file.close();
@@ -273,7 +290,7 @@ function CityModDatabase::saveData(%this, %id) {
 	%data = %this.dataTable.get(%id); %index = 0;
 	while((%field = %data.getTaggedField(%index)) !$= "") {
 		%name = getField(%field, 0);
-		%file.writeLine(%name TAB Stringify::serialize(getFields(%field, 1)));
+		%file.writeLine("#" @ %name TAB Stringify::serialize(getFields(%field, 1), false));
 		%index++;
 	}
 

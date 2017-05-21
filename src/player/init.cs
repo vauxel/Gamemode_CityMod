@@ -6,7 +6,7 @@
 exec("./datablock.cs");
 exec("./infopanel.cs");
 exec("./skills.cs");
-exec("./hitbox.cs");
+exec("./bodies.cs");
 
 if(!isObject(CM_SkillsInfo)) {
 	new ScriptObject(CM_SkillsInfo) {

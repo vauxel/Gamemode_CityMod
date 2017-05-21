@@ -4,6 +4,7 @@
 // ============================================================
 
 exec("./bank.cs");
+exec("./money.cs");
 
 if(!isObject(CM_Bank)) {
 	new ScriptObject(CM_Bank) {
