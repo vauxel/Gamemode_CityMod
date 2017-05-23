@@ -57,21 +57,21 @@ function servercmdCM_Organizations_requestOverviewInfo(%client, %id) {
 	%organization = CM_Organizations.getData(%id);
 
 	%openings = 0;
-	%avgsalary = 0;
+	%avgpay = 0;
 
 	for(%i = 0; %i < %organization.jobs.keys.length; %i++) {
 		%job = %organization.jobs.get(%organization.jobs.keys.value[%i]);
 		%openings += %job.get("Openings");
-		%avgsalary += (%job.get("Salary") / %organization.jobs.keys.length);
+		%avgpay += (%job.get("Pay") / %organization.jobs.keys.length);
 	}
 
 	if(!%organization.memberExists(%client.bl_id)) {
-		commandtoclient(%client, 'CM_Organizations_setOverviewInfo', %organization.name, %organization.founded, CM_Players.getData(%organization.founder).name, CM_Players.getData(%organization.owner).name, %organization.members.length, %organization.jobs.keys.length, %openings, %avgsalary);
+		commandtoclient(%client, 'CM_Organizations_setOverviewInfo', %organization.name, %organization.founded, CM_Players.getData(%organization.founder).name, CM_Players.getData(%organization.owner).name, %organization.members.length, %organization.jobs.keys.length, %openings, %avgpay);
 	} else {
 		%member = %organization.members.value[%organization.findMember(%client.bl_id)];
 		%memberJob = %organization.jobs.get(%member.get("JobID"));
 
-		commandtoclient(%client, 'CM_Organizations_setOverviewInfo', %organization.name, %organization.founded, CM_Players.getData(%organization.founder).name, CM_Players.getData(%organization.owner).name, %organization.members.length, %organization.jobs.keys.length, %openings, %avgsalary, %member.get("Hired"), %memberJob.get("Name"), %memberJob.get("Salary"), %member.get("Infractions"));
+		commandtoclient(%client, 'CM_Organizations_setOverviewInfo', %organization.name, %organization.founded, CM_Players.getData(%organization.founder).name, CM_Players.getData(%organization.owner).name, %organization.members.length, %organization.jobs.keys.length, %openings, %avgpay, %member.get("Hired"), %memberJob.get("Name"), %memberJob.get("Pay"), %member.get("Infractions"));
 	}
 }
 
@@ -120,7 +120,7 @@ function servercmdCM_Organizations_requestMembers(%client, %id) {
 }
 
 function servercmdCM_Organizations_requestJobConstraints(%client) {
-	commandtoclient(%client, 'CM_Organizations_setJobConstraints', $CM::Config::Organizations::MaxJobDescLength, $CM::Config::Organizations::MaxJobSalary);
+	commandtoclient(%client, 'CM_Organizations_setJobConstraints', $CM::Config::Organizations::MaxJobDescLength, $CM::Config::Organizations::MaxJobPay);
 }
 
 function servercmdCM_Organizations_requestJobModification(%client, %id, %jobID) {
@@ -143,7 +143,7 @@ function servercmdCM_Organizations_requestJobModification(%client, %id, %jobID) 
 
 	%job = %organization.jobs.get(%jobID);
 
-	commandtoclient(%client, 'CM_Organizations_setJobModification', %job.get("Name"), %job.get("Description"), %job.get("Salary"), %job.get("Openings"), %job.get("Auto Accept"));
+	commandtoclient(%client, 'CM_Organizations_setJobModification', %job.get("Name"), %job.get("Description"), %job.get("Pay"), %job.get("Openings"), %job.get("Auto Accept"));
 }
 
 function servercmdCM_Organizations_requestJobs(%client, %id) {
@@ -161,7 +161,7 @@ function servercmdCM_Organizations_requestJobs(%client, %id) {
 
 	for(%i = 0; %i < %organization.jobs.keys.length; %i++) {
 		%job = %organization.jobs.get(%organization.jobs.keys.value[%i]);
-		commandtoclient(%client, 'CM_Organizations_addJob', %organization.jobs.keys.value[%i], %job.get("Name"), %job.get("Salary"), %job.get("Tasks").length);
+		commandtoclient(%client, 'CM_Organizations_addJob', %organization.jobs.keys.value[%i], %job.get("Name"));
 	}
 }
 
@@ -215,12 +215,12 @@ function servercmdCM_Organizations_requestJobSkills(%client, %id, %jobID) {
 }
 
 function servercmdCM_Organizations_requestAllTasks(%client) {
-	for(%i = 0; %i < CM_OrganizationJobTasks.getCount(); %i++) {
-		%taskID = CM_OrganizationJobTasks.getObject(%i).taskID;
-		%taskName = CM_OrganizationJobTasks.getObject(%i).taskName;
-		%taskDescription = CM_OrganizationJobTasks.getObject(%i).taskDescription;
+	for(%i = 0; %i < CM_TasksInfo.recordsList.length; %i++) {
+		%taskID = CM_TasksInfo.recordsList.value[%i];
+		%taskName = CM_TasksInfo.getRecord(%taskID, "Name");
+		%taskDescription = CM_TasksInfo.getRecord(%taskID, "Description");
 
-		commandtoclient(%client, 'CM_Organizations_addAllTask', %taskID, %taskName, %taskDescription);
+		commandtoclient(%client, 'CM_Organizations_addJobAllTask', %taskID, %taskName, %taskDescription);
 	}
 }
 
@@ -232,7 +232,7 @@ function servercmdCM_Organizations_requestJobTasks(%client, %id, %jobID) {
 
 	%organization = CM_Organizations.getData(%id);
 
-	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 1) {
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJT(2)", "INSUFFICIENT_PERMISSION");
 		return;
 	}
@@ -244,9 +244,10 @@ function servercmdCM_Organizations_requestJobTasks(%client, %id, %jobID) {
 
 	for(%i = 0; %i < %organization.jobs.get(%jobID).get("Tasks").length; %i++) {
 		%taskID = %organization.jobs.get(%jobID).get("Tasks").value[%i];
-		%taskName = CM_OrganizationJobTasks.getTask(%taskID).taskName;
+		%taskName = CM_TasksInfo.getRecord(%taskID, "Name");
+		%taskDescription = CM_TasksInfo.getRecord(%taskID, "Description");
 
-		commandtoclient(%client, 'CM_Organizations_addJobTask', %taskID, %taskName);
+		commandtoclient(%client, 'CM_Organizations_addJobTask', %taskID, %taskName, %taskDescription);
 	}
 }
 
@@ -401,7 +402,7 @@ function servercmdCM_Organizations_joinOrganization(%client, %id) {
 					continue;
 				}
 
-				commandtoclient(%client, 'CM_Organizations_addAvailableJob', %job.get("Name"), %job.get("Description"), %job.get("Salary"), %job.get("Openings"), %job.get("Auto Accept"));
+				commandtoclient(%client, 'CM_Organizations_addAvailableJob', %job.get("Name"), %job.get("Description"), %job.get("Pay"), %job.get("Openings"), %job.get("Auto Accept"));
 
 				for(%i = 0; %i < %job.get("Prerequisites").length; %i++) {
 					%skillID = %job.get("Prerequisites").value[%i];
@@ -685,7 +686,7 @@ function servercmdCM_Organizations_revokeInvitation(%client, %id, %bl_id) {
 	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "BLID" SPC %bl_id @ "'s invitation into the organization has been revoked.");
 }
 
-function servercmdCM_Organizations_createJob(%client, %id, %name, %description, %salary, %openings, %autoaccept) {
+function servercmdCM_Organizations_createJob(%client, %id, %name, %description, %pay, %openings, %autoaccept) {
 	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_cJ(1)", "INVALID_ID");
 		return;
@@ -698,7 +699,7 @@ function servercmdCM_Organizations_createJob(%client, %id, %name, %description, 
 		return;
 	}
 
-	%return = %organization.createJob(%name, %description, %salary, %openings, %autoaccept);
+	%return = %organization.createJob(%name, %description, %pay, %openings, %autoaccept);
 
 	if(firstWord(%return) $= "ERROR") {
 		switch$(getWord(%return, 1)) {
@@ -707,8 +708,8 @@ function servercmdCM_Organizations_createJob(%client, %id, %name, %description, 
 			case "INVALID_NAME_LENGTH": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The name given is too long!"); return;
 			case "INVALID_DESC": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The description of a Job cannot be blank!"); return;
 			case "INVALID_DESC_LENGTH": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The description given is too long!"); return;
-			case "INVALID_SALARY": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The salary of a Job cannot be blank or a non-integer!"); return;
-			case "INVALID_SALARY_AMT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The salary given is out of the valid range!"); return;
+			case "INVALID_PAY": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The pay of a Job cannot be blank or a non-integer!"); return;
+			case "INVALID_PAY_AMT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The pay given is out of the valid range!"); return;
 			case "INVALID_OPENINGS": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The openings amount of a Job cannot be blank or a non-integer!"); return;
 			case "INVALID_OPENINGS_AMT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The openings amount given is out of the valid range!"); return;
 			case "INVALID_AUTOACCEPT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The auto-accept value given must be a boolean!"); return;
@@ -723,7 +724,7 @@ function servercmdCM_Organizations_createJob(%client, %id, %name, %description, 
 	commandtoclient(%client, 'CM_Organizations_closeJobModification');
 }
 
-function servercmdCM_Organizations_updateJob(%client, %id, %jobID, %name, %description, %salary, %openings, %autoaccept) {
+function servercmdCM_Organizations_updateJob(%client, %id, %jobID, %name, %description, %pay, %openings, %autoaccept) {
 	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_uJ(1)", "INVALID_ID");
 		return;
@@ -736,7 +737,7 @@ function servercmdCM_Organizations_updateJob(%client, %id, %jobID, %name, %descr
 		return;
 	}
 
-	%return = %organization.updateJob(%jobID, %name, %description, %salary, %openings, %autoaccept);
+	%return = %organization.updateJob(%jobID, %name, %description, %pay, %openings, %autoaccept);
 
 	if(firstWord(%return) $= "ERROR") {
 		switch$(getWord(%return, 1)) {
@@ -746,8 +747,8 @@ function servercmdCM_Organizations_updateJob(%client, %id, %jobID, %name, %descr
 			case "INVALID_NAME_LENGTH": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The name given is too long!"); return;
 			case "INVALID_DESC": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The description of a Job cannot be blank!"); return;
 			case "INVALID_DESC_LENGTH": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The description given is too long!"); return;
-			case "INVALID_SALARY": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The salary of a Job cannot be blank or a non-integer!"); return;
-			case "INVALID_SALARY_AMT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The salary given is out of the valid range!"); return;
+			case "INVALID_PAY": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The pay of a Job cannot be blank or a non-integer!"); return;
+			case "INVALID_PAY_AMT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The pay given is out of the valid range!"); return;
 			case "INVALID_OPENINGS": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The openings amount of a Job cannot be blank or a non-integer!"); return;
 			case "INVALID_OPENINGS_AMT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The openings amount given is out of the valid range!"); return;
 			case "INVALID_AUTOACCEPT": commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The auto-accept value given must be a boolean!"); return;
@@ -829,7 +830,7 @@ function servercmdCM_Organizations_addJobTask(%client, %id, %jobID, %taskID) {
 		}
 	}
 
-	commandtoclient(%client, 'CM_Organizations_addJobTask', %taskID, CM_OrganizationJobTasks.getTask(%taskID).taskName);
+	commandtoclient(%client, 'CM_Organizations_addJobTask', %taskID, CM_TasksInfo.getRecord(%taskID, "Name"));
 }
 
 function servercmdCM_Organizations_removeJobTask(%client, %id, %jobID, %taskID) {
@@ -865,7 +866,7 @@ function servercmdCM_Organizations_removeJobTask(%client, %id, %jobID, %taskID) 
 		}
 	}
 
-	commandtoclient(%client, 'CM_Organizations_removeOrganizationJobTask', %taskID);
+	commandtoclient(%client, 'CM_Organizations_removeJobTask', %taskID);
 }
 
 function servercmdCM_Organizations_changeMemberJob(%client, %id, %bl_id, %jobID) {

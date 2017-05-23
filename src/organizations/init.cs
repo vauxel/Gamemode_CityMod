@@ -32,9 +32,11 @@ if(!isObject(CM_Organizations)) {
 	CityModOrganizationsModule.add(CM_Organizations);
 }
 
-//if(!isObject(CM_OrganizationJobTasks) && isObject(CM_Organizations)) {
-//	new ScriptGroup(CM_OrganizationJobTasks);
-//	CM_OrganizationJobTasks.registerTask("TEST_TASK", "Test Task", "Task activated through the console");
-//
-//	CityModOrganizationsModule.add(CM_Organizations);
-//}
+if(!isObject(CM_TasksInfo)) {
+	new ScriptObject(CM_TasksInfo) {
+		class = "CityModInfoDB";
+		path = $CM::Config::Path::Mod @ "res/info/tasks/";
+	};
+
+	CityModOrganizationsModule.add(CM_TasksInfo);
+}

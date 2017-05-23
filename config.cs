@@ -39,7 +39,7 @@ $CM::Config::Organizations::MaxOrganizationDescLength = 192;
 $CM::Config::Organizations::MaxJobs = 25;
 $CM::Config::Organizations::MaxJobNameLength = 28;
 $CM::Config::Organizations::MaxJobDescLength = 192;
-$CM::Config::Organizations::MaxJobSalary = 100000;
+$CM::Config::Organizations::MaxJobPay = 100000;
 $CM::Config::Organizations::MaxJobOpenings = 1000;
 $CM::Config::Organizations::MaxJobTasks = 20;
 

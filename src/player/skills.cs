@@ -142,9 +142,9 @@ function CM_SkillsInfo::addSkillSet(%this, %rawname, %name) {
 
 	%this.skillsets.set(%rawname, %name);
 	%this.setAttribute(%rawname, new ScriptObject() {
-    class = "CityModInfoDB";
-    path = $CM::Config::Path::Mod @ "res/info/skills/" @ %rawname;
-  });
+		class = "CityModInfoDB";
+		path = $CM::Config::Path::Mod @ "res/info/skills/" @ %rawname;
+	});
 }
 
 // ============================================================

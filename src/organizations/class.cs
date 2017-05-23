@@ -101,7 +101,7 @@ function CityModOrganization::getUserPrivilegeLevel(%this, %bl_id) {
 	return %level;
 }
 
-function CityModOrganization::createJob(%this, %name, %description, %salary, %openings, %autoaccept) {
+function CityModOrganization::createJob(%this, %name, %description, %pay, %openings, %autoaccept) {
 	if(%this.jobs.keys.length >= $CM::Config::Organizations::MaxJobs) {
 		CMError(2, "CityModOrganization::createJob() ==> Too many jobs already exist");
 		return "ERROR MAX_JOB_AMOUNT";
@@ -127,14 +127,14 @@ function CityModOrganization::createJob(%this, %name, %description, %salary, %op
 		return "ERROR INVALID_DESC_LENGTH";
 	}
 
-	if(!strLen(%salary) || !isNumber(%salary)) {
-		CMError(2, "CityModOrganization::createJob() ==> Invalid \"%salary\" given -- cannot be blank or a non-integer");
-		return "ERROR INVALID_SALARY";
+	if(!strLen(%pay) || !isNumber(%pay)) {
+		CMError(2, "CityModOrganization::createJob() ==> Invalid \"%pay\" given -- cannot be blank or a non-integer");
+		return "ERROR INVALID_PAY";
 	}
 
-	if((%salary < 0) || (%salary > $CM::Config::Organizations::MaxJobSalary)) {
-		CMError(2, "CityModOrganization::createJob() ==> Invalid \"%salary\" given -- out of bounds (0 < " @ %salary @ " < " @ $CM::Config::Organizations::MaxJobSalary @ ")");
-		return "ERROR INVALID_SALARY_AMT";
+	if((%pay < 0) || (%pay > $CM::Config::Organizations::MaxJobPay)) {
+		CMError(2, "CityModOrganization::createJob() ==> Invalid \"%pay\" given -- out of bounds (0 < " @ %pay @ " < " @ $CM::Config::Organizations::MaxJobPay @ ")");
+		return "ERROR INVALID_PAY_AMT";
 	}
 
 	if(!strLen(%openings) || !isNumber(%openings)) {
@@ -169,16 +169,17 @@ function CityModOrganization::createJob(%this, %name, %description, %salary, %op
 	%job = Map();
 	%job.set("Name", %name);
 	%job.set("Description", %description);
-	%job.set("Salary", %salary);
+	%job.set("Pay", %pay);
 	%job.set("Openings", %openings);
 	%job.set("Auto Accept", %autoaccept ? true : false);
 	%job.set("Prerequisites", Array());
 	%job.set("Tasks", Array());
+	%job.set("Type", "commision");
 
 	%this.jobs.set(%jobID, %job);
 }
 
-function CityModOrganization::updateJob(%this, %jobID, %name, %description, %salary, %openings, %autoaccept) {
+function CityModOrganization::updateJob(%this, %jobID, %name, %description, %pay, %openings, %autoaccept) {
 	if(!strLen(%jobID) || !isNumber(%jobID)) {
 		CMError(2, "CityModOrganization::updateJob() ==> Invalid \"%jobID\" given -- cannot be blank or a non-integer");
 		return "ERROR INVALID_JOBID";
@@ -209,14 +210,14 @@ function CityModOrganization::updateJob(%this, %jobID, %name, %description, %sal
 		return "ERROR INVALID_DESC_LENGTH";
 	}
 
-	if(!strLen(%salary) || !isNumber(%salary)) {
-		CMError(2, "CityModOrganization::updateJob() ==> Invalid \"%salary\" given -- cannot be blank or a non-integer");
-		return "ERROR INVALID_SALARY";
+	if(!strLen(%pay) || !isNumber(%pay)) {
+		CMError(2, "CityModOrganization::updateJob() ==> Invalid \"%pay\" given -- cannot be blank or a non-integer");
+		return "ERROR INVALID_PAY";
 	}
 
-	if((%salary < 0) || (%salary > $CM::Config::Organizations::MaxJobSalary)) {
-		CMError(2, "CityModOrganization::updateJob() ==> Invalid \"%salary\" given -- out of bounds (0 < " @ %salary @ " < " @ $CM::Config::Organizations::MaxJobSalary @ ")");
-		return "ERROR INVALID_SALARY_AMT";
+	if((%pay < 0) || (%pay > $CM::Config::Organizations::MaxJobPay)) {
+		CMError(2, "CityModOrganization::updateJob() ==> Invalid \"%pay\" given -- out of bounds (0 < " @ %pay @ " < " @ $CM::Config::Organizations::MaxJobPay @ ")");
+		return "ERROR INVALID_PAY_AMT";
 	}
 
 	if(!strLen(%openings) || !isNumber(%openings)) {
@@ -237,7 +238,7 @@ function CityModOrganization::updateJob(%this, %jobID, %name, %description, %sal
 	%job = %this.jobs.get(%jobID);
 	%job.set("Name", %name);
 	%job.set("Description", %description);
-	%job.set("Salary", %salary);
+	%job.set("Pay", %pay);
 	%job.set("Openings", %openings);
 	%job.set("Auto Accept", %autoaccept ? true : false);
 }
@@ -308,7 +309,7 @@ function CityModOrganization::addJobTask(%this, %jobID, %taskID) {
 		return "ERROR INVALID_TASKID";
 	}
 
-	if(!isExplicitObject(CM_OrganizationJobTasks.getTask(%taskID))) {
+	if(!CM_TasksInfo.recordExists(%taskID)) {
 		CMError(2, "CityModOrganization::addJobTask() ==> A task by the ID of" SPC %taskID SPC "does not exist");
 		return "ERROR NONEXISTENT_TASK";
 	}
@@ -337,21 +338,14 @@ function CityModOrganization::removeJobTask(%this, %jobID, %taskID) {
 		return "ERROR INVALID_TASKID";
 	}
 
-	%taskFound = false;
-	for(%i = 0; %i < %this.jobs.get(%jobID).get("Tasks").length; %i++) {
-		if(%this.jobs.get(%jobID).get("Tasks").value[%i] $= %taskID) {
-			%taskFound = true;
-			%index = %i;
-			break;
-		}
-	}
+	%taskIndex = %this.jobs.get(%jobID).get("Tasks").find(%taskID);
 
-	if(!%taskFound) {
+	if(%taskIndex == -1) {
 		CMError(2, "CityModOrganization::deleteJob() ==> A task by the ID of" SPC %taskID SPC "does not exist in this job");
 		return "ERROR NONEXISTENT_TASK";
 	}
 
-	%this.jobs.get(%jobID).get("Tasks").pop(%index);
+	%this.jobs.get(%jobID).get("Tasks").pop(%taskIndex);
 }
 
 function CityModOrganization::deleteJob(%this, %jobID) {
@@ -644,7 +638,7 @@ function CityModOrganization::paySalaries(%this) {
 	%payment = 0;
 
 	for(%i = 0; %i < %this.members.length; %i++) {
-		%payment += %this.jobs.get(%this.members.value[%i].get("JobID")).get("Salary");
+		%payment += %this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay");
 	}
 
 	if(%payment > %account.balance) {
@@ -658,10 +652,10 @@ function CityModOrganization::paySalaries(%this) {
 			continue;
 		}
 
-		%memberAccount.addFunds(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Salary"), "Salary Payment (" @ CM_Tick.getShortDate() @ ")");
+		%memberAccount.addFunds(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay"), "Pay Payment (" @ CM_Tick.getShortDate() @ ")");
 	}
 
-	%account.removeFunds(%payment, "Salary Payout (" @ CM_Tick.getShortDate() @ ")");
+	%account.removeFunds(%payment, "Paycheck (" @ CM_Tick.getShortDate() @ ")");
 }
 
 package CityMod_Organizations {

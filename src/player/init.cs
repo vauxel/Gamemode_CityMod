@@ -16,7 +16,7 @@ if(!isObject(CM_SkillsInfo)) {
 	CM_SkillsInfo.addSkillSet("law", "Law");
 	CM_SkillsInfo.addSkillSet("guns", "Gun Handling");
 
-	CityModDatabaseModule.add(CM_SkillsInfo);
+	CityModPlayerModule.add(CM_SkillsInfo);
 }
 
 CM_Players.addField("Skills", (new ScriptObject() {
