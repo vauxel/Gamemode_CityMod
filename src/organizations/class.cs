@@ -256,7 +256,7 @@ function CityModOrganization::addJobSkill(%this, %jobID, %skillID) {
 
 	if(!strLen(%skillID)) {
 		CMError(2, "CityModOrganization::addJobSkill() ==> Invalid \"%skillID\" given -- cannot be blank");
-		return "ERROR INVALID_SKILL";
+		return "ERROR INVALID_SKILLID";
 	}
 
 	if(!CM_SkillsInfo.skillIDExists(%skillID)) {
@@ -280,7 +280,7 @@ function CityModOrganization::removeJobSkill(%this, %jobID, %skillID) {
 
 	if(!strLen(%skillID)) {
 		CMError(2, "CityModOrganization::removeJobSkill() ==> Invalid \"%skillID\" given -- cannot be blank");
-		return "ERROR INVALID_SKILL";
+		return "ERROR INVALID_SKILLID";
 	}
 
 	%index = %this.jobs.get(%jobID).get("Prerequisites").find(%skillID);
@@ -628,7 +628,7 @@ function CityModOrganization::getBankAccount(%this) {
 	return CM_Bank.resolveAccountNumber(%this.account);
 }
 
-function CityModOrganization::paySalaries(%this) {
+function CityModOrganization::payEmployees(%this) {
 	%account = %this.getBankAccount();
 
 	if(%account.balance <= 0) {
@@ -638,7 +638,9 @@ function CityModOrganization::paySalaries(%this) {
 	%payment = 0;
 
 	for(%i = 0; %i < %this.members.length; %i++) {
-		%payment += %this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay");
+		if(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Type") $= "salary") {
+			%payment += %this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay");
+		}
 	}
 
 	if(%payment > %account.balance) {
@@ -646,16 +648,20 @@ function CityModOrganization::paySalaries(%this) {
 	}
 
 	for(%i = 0; %i < %this.members.length; %i++) {
+		if(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Type") !$= "salary") {
+			continue;
+		}
+
 		%memberAccount = CM_Bank.resolveAccountNumber(CM_Players.getData(%this.members.value[%i].get("BLID")).account);
 
 		if(%memberAccount == -1) {
 			continue;
 		}
 
-		%memberAccount.addFunds(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay"), "Pay Payment (" @ CM_Tick.getShortDate() @ ")");
+		%memberAccount.addFunds(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay"), "Organization Paycheck");
 	}
 
-	%account.removeFunds(%payment, "Paycheck (" @ CM_Tick.getShortDate() @ ")");
+	%account.removeFunds(%payment, "Salary/Commision Payout");
 }
 
 package CityMod_Organizations {
@@ -664,7 +670,7 @@ package CityMod_Organizations {
 
 		if(isObject(CM_Organizations)) {
 			for(%i = 0; %i < CM_Organizations.dataTable.keys.length; %i++) {
-				CM_Organizations.dataTable.get(CM_Organizations.dataTable.keys.value[%i]).paySalaries();
+				CM_Organizations.dataTable.get(CM_Organizations.dataTable.keys.value[%i]).payEmployees();
 			}
 		}
 	}

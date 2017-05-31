@@ -186,6 +186,24 @@ function servercmdCM_Organizations_requestJobGroups(%client, %id) {
 	}
 }
 
+function servercmdCM_Organizations_requestAllSkills(%client) {
+	for(%i = 0; %i < CM_SkillsInfo.skillsets.keys.length; %i++) {
+		%skillset = CM_SkillsInfo.skillsets.keys.value[%i];
+		%skillsetName = CM_SkillsInfo.getSkillSetName(%skillset);
+
+		for(%j = 0; %j < CM_SkillsInfo.getSkillset(%skillset).recordsList.length; %j++) {
+			%skill = CM_SkillsInfo.getSkillset(%skillset).recordsList.value[%j];
+			%skillName = CM_SkillsInfo.getSkillset(%skillset).getRecord(%skill, "Name");
+
+			if(%skillName $= "order") {
+				continue;
+			}
+
+			commandtoclient(%client, 'CM_Organizations_addJobAllSkill', %skillset, %skillsetName, %skill, %skillName);
+		}
+	}
+}
+
 function servercmdCM_Organizations_requestJobSkills(%client, %id, %jobID) {
 	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
 		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJS(1)", "INVALID_ID");
@@ -205,7 +223,7 @@ function servercmdCM_Organizations_requestJobSkills(%client, %id, %jobID) {
 	}
 
 	for(%i = 0; %i < CM_SkillsInfo.skillsets.keys.length; %i++) {
-		%skillsetName = CM_SkillsInfo.skillsets.get(%skillset = CM_SkillsInfo.skillsets.keys.value[%i]);
+		%skillsetName = CM_SkillsInfo.getSkillSetName(%skillset = CM_SkillsInfo.skillsets.keys.value[%i]);
 		%skillsetSO = CM_SkillsInfo.getSkillSet(%skillset);
 		while((%skill = %skillsetSO.getRecord("order", %index)) !$= "") {
 			commandtoclient(%client, 'CM_Organizations_addJobSkill', %skillset, %skillsetName, %skill, %skillsetSO.getRecord(%skill, "Name"));
@@ -249,6 +267,27 @@ function servercmdCM_Organizations_requestJobTasks(%client, %id, %jobID) {
 
 		commandtoclient(%client, 'CM_Organizations_addJobTask', %taskID, %taskName, %taskDescription);
 	}
+}
+
+function servercmdCM_Organizations_requestJobType(%client, %id, %jobID) {
+	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJT(1)", "INVALID_ID");
+		return;
+	}
+
+	%organization = CM_Organizations.getData(%id);
+
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJT(2)", "INSUFFICIENT_PERMISSION");
+		return;
+	}
+
+	if(!%organization.jobExists(%jobID)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJT(3)", "NONEXISTENT_JOB");
+		return;
+	}
+
+	commandtoclient(%client, 'CM_Organizations_setJobTaskType', %organization.jobs.get(%jobID).get("Type"));
 }
 
 // Deprecated
@@ -402,7 +441,7 @@ function servercmdCM_Organizations_joinOrganization(%client, %id) {
 					continue;
 				}
 
-				commandtoclient(%client, 'CM_Organizations_addAvailableJob', %job.get("Name"), %job.get("Description"), %job.get("Pay"), %job.get("Openings"), %job.get("Auto Accept"));
+				commandtoclient(%client, 'CM_Organizations_addAvailableJob', %job.get("Name"), %job.get("Description"), %job.get("Pay"), %job.get("Type"), %job.get("Openings"), %job.get("Auto Accept"));
 
 				for(%i = 0; %i < %job.get("Prerequisites").length; %i++) {
 					%skillID = %job.get("Prerequisites").value[%i];
@@ -758,6 +797,7 @@ function servercmdCM_Organizations_updateJob(%client, %id, %jobID, %name, %descr
 
 	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "The job," SPC %name SPC "(#" @ %jobID @ "), has been successfully updated.");
 	commandtoclient(%client, 'CM_Organizations_closeJobModification');
+	commandtoclient(%client, 'CM_Organizations_updateJobName', %jobID, %name);
 }
 
 function servercmdCM_Organizations_deleteJob(%client, %id, %jobID) {
@@ -792,6 +832,99 @@ function servercmdCM_Organizations_deleteJob(%client, %id, %jobID) {
 
 	commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "Job #" @ %jobID SPC "has been deleted from the Organization. Any members holding this job have been reassigned.");
 	commandtoclient(%client, 'CM_Organizations_deleteJob', %jobID);
+}
+
+function servercmdCM_Organizations_setJobType(%client, %id, %jobID, %type) {
+	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_sJT(1)", "INVALID_ID");
+		return;
+	}
+
+	%organization = CM_Organizations.getData(%id);
+
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_sJT(2)", "INSUFFICIENT_PERMISSION");
+		return;
+	}
+
+	if((%type !$= "commision") && (%type !$= "salary")) {
+		%organization.jobs.get(%jobID).set("Type", strLwr(%type));
+	}
+}
+
+function servercmdCM_Organizations_addJobSkill(%client, %id, %jobID, %skillID) {
+	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_aJS(1)", "INVALID_ID");
+		return;
+	}
+
+	%organization = CM_Organizations.getData(%id);
+
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_aJS(2)", "INSUFFICIENT_PERMISSION");
+		return;
+	}
+
+	%return = %organization.addJobSkill(%jobID, %skillID);
+
+	if(firstWord(%return) $= "ERROR") {
+		switch$(getWord(%return, 1)) {
+			case "INVALID_JOBID":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You must specify a valid, integer ID of a Job to add a Skill to it!");
+				return;
+			case "NONEXISTENT_JOB":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "A Job by this ID does not exist!");
+				return;
+			case "INVALID_SKILLID":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You must specify a valid, non-blank ID of a Skill to add!");
+				return;
+			case "NONEXISTENT_SKILL":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "A Skill by this ID does not exist!");
+				return;
+			default: commandtoclient(%client, 'CM_errorMessage', "CM_O_aJS(3)", getWord(%return, 1)); return;
+		}
+	}
+
+	%skillset = getWord(strReplace(%skillID, ":", " "), 0);
+	%skill = getWord(strReplace(%skillID, ":", " "), 1);
+
+	commandtoclient(%client, 'CM_Organizations_addJobSkill', %skillset, CM_SkillsInfo.getSkillSetName(%skillset), %skill, CM_SkillsInfo.getSkillSet(%skillset).getRecord(%skill, "Name"));
+}
+
+function servercmdCM_Organizations_removeJobSkill(%client, %id, %jobID, %skillID) {
+	if(!strLen(%id) || !CM_Organizations.dataExists(%id)) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJS(1)", "INVALID_ID");
+		return;
+	}
+
+	%organization = CM_Organizations.getData(%id);
+
+	if(%organization.getUserPrivilegeLevel(%client.bl_id) < 2) {
+		commandtoclient(%client, 'CM_errorMessage', "CM_O_rJS(2)", "INSUFFICIENT_PERMISSION");
+		return;
+	}
+
+	%return = %organization.removeJobSkill(%jobID, %skillID);
+
+	if(firstWord(%return) $= "ERROR") {
+		switch$(getWord(%return, 1)) {
+			case "INVALID_JOBID":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You must specify a valid, integer ID of a Job to remove a Skill from it!");
+				return;
+			case "NONEXISTENT_JOB":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "A Job by this ID does not exist!");
+				return;
+			case "INVALID_SKILLID":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "You must specify a valid, non-blank ID of a Skill to remove!");
+				return;
+			case "NONEXISTENT_SKILL":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "A Skill by this ID does not exist!");
+				return;
+			default: commandtoclient(%client, 'CM_errorMessage', "CM_O_rJS(3)", getWord(%return, 1)); return;
+		}
+	}
+
+	commandtoclient(%client, 'CM_Organizations_removeJobTask', getWord(strReplace(%skillID, ":", " "), 0), getWord(strReplace(%skillID, ":", " "), 1));
 }
 
 function servercmdCM_Organizations_addJobTask(%client, %id, %jobID, %taskID) {
