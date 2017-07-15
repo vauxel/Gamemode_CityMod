@@ -8,6 +8,7 @@
 //     1.2: Tick
 //     1.3: Organizations
 //     1.4: Players
+//     1.5: Properties
 // ============================================================
 
 // ============================================================
@@ -61,3 +62,10 @@ $CM::Config::Players::MaxDamage["head"] = 125;
 $CM::Config::Players::MaxDamage["torso"] = 100;
 $CM::Config::Players::MaxDamage["legs"] = 50;
 $CM::Config::Players::MaxDamage["arms"] = 50;
+
+// ------------------------------------------------------------
+// Section 1.5 - Properties
+// ------------------------------------------------------------
+$CM::Config::Properties::MaxNameLength = 32;
+$CM::Config::Properties::MaxDescLength = 192;
+$CM::Config::Properties::MaxPrice = 1000000000;

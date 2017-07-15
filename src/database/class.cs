@@ -43,9 +43,10 @@ function CityModDatabase::isDataLoaded(%this, %id) {
 	return isExplicitObject(%this.dataTable.get(%id));
 }
 
-function CityModDatabase::createDataSO(%this) {
+function CityModDatabase::createDataSO(%this, %id) {
 	return (new ScriptObject() {
 		class = %this.dataClass;
+		dataID = strLen(%id) ? %id : "";
 	} @ "\x01");
 }
 
@@ -124,7 +125,7 @@ function CityModDatabase::addData(%this, %id) {
 		return "ERROR";
 	}
 
-	%data = %this.createDataSO();
+	%data = %this.createDataSO(%id);
 
 	for(%i = 0; %i < %this.fieldTable.keys.length; %i++) {
 		%name = %this.fieldTable.keys.value[%i];
@@ -207,7 +208,7 @@ function CityModDatabase::loadData(%this, %id) {
 		return "ERROR";
 	}
 
-	%data = %this.createDataSO();
+	%data = %this.createDataSO(%id);
 
 	%currentField["name"] = "";
 	%currentField["data"] = "";

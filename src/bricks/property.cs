@@ -45,8 +45,8 @@ package CityMod_Bricks_Property {
 	function fxDTSBrick::onCMPropertyPlant(%brick) {
 		parent::onCMPropertyPlant(%brick);
 
-		if(!strLen(%brick.propertyID) || !CM_RealEstate.dataExists(%brick.propertyID)) {
-			%brick.propertyID = CM_RealEstate.property;
+		if(strLen(%brick.propertyID) && CM_RealEstate.dataExists(%brick.propertyID)) {
+			CM_RealEstate.getData(%brick.propertyID).linkPropertyBrick(%brick.getID());
 		}
 	}
 };

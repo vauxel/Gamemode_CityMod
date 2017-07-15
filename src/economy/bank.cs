@@ -266,7 +266,7 @@ function CM_Bank::registerAccount(%this, %type, %owner) {
 }
 
 function CM_Bank::closeAccount(%this) {
-
+	// TO-DO
 }
 
 function CM_Bank::generateAccountNumber(%this, %type, %id) {

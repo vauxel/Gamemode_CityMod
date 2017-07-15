@@ -15,6 +15,12 @@ if(!isObject(CM_RealEstate)) {
 	CM_RealEstate.addField("Name", "Generic Property");
 	CM_RealEstate.addField("Type", "Residential");
 	CM_RealEstate.addField("Owner", 888888);
+	CM_RealEstate.addField("Proprietorship", "player");
+	CM_RealEstate.addField("Size", "32x32");
+	CM_RealEstate.addField("Description", "This property's description has not been set.");
+	CM_RealEstate.addField("Price", 0);
+	CM_RealEstate.addField("Selling", true);
+	CM_RealEstate.addField("Brick", -1);
 
 	CityModRealEstateModule.add(CM_RealEstate);
 }
