@@ -174,7 +174,7 @@ function CityModOrganization::createJob(%this, %name, %description, %pay, %openi
 	%job.set("Auto Accept", %autoaccept ? true : false);
 	%job.set("Prerequisites", Array());
 	%job.set("Tasks", Array());
-	%job.set("Type", "commision");
+	%job.set("Type", "commission");
 
 	%this.jobs.set(%jobID, %job);
 }
@@ -423,11 +423,14 @@ function CityModOrganization::employPlayer(%this, %bl_id, %jobID) {
 	%member = Map();
 	%member.set("BLID", %bl_id);
 	%member.set("JobID", %jobID);
+	%member.set("Completed Tasks", "");
 	%member.set("isModerator", false);
 	%member.set("Infractions", 0);
 	%member.set("Hired", CM_Tick.getLongDate());
 
 	%this.members.push(%member);
+
+	CM_Players.getData(%bl_id).organizations.push(%this.dataID);
 }
 
 function CityModOrganization::changeMemberJob(%this, %bl_id, %jobID) {
@@ -476,6 +479,10 @@ function CityModOrganization::kickMember(%this, %bl_id) {
 
 	%this.members.value[%index].delete();
 	%this.members.pop(%index);
+
+	if(CM_Players.dataExists(%bl_id)) {
+		CM_Players.getData(%bl_id).organizations.remove(%this.dataID);
+	}
 }
 
 function CityModOrganization::isInvited(%this, %bl_id) {
@@ -638,8 +645,13 @@ function CityModOrganization::payEmployees(%this) {
 	%payment = 0;
 
 	for(%i = 0; %i < %this.members.length; %i++) {
-		if(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Type") $= "salary") {
-			%payment += %this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay");
+		%member = %this.members.value[%i];
+		%job = %this.jobs.get(%member.get("JobID"));
+
+		if(%job.get("Type") $= "salary") {
+			%payment += mFloor(%job.get("Pay") * (getWordCount(%member.get("Completed Tasks")) / %job.get("Tasks").length));
+		} else if(%job.get("Type") $= "commission") {
+			%payment += (%job.get("Pay") * getWordCount(%member.get("Completed Tasks")));
 		}
 	}
 
@@ -648,24 +660,29 @@ function CityModOrganization::payEmployees(%this) {
 	}
 
 	for(%i = 0; %i < %this.members.length; %i++) {
-		if(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Type") !$= "salary") {
-			continue;
-		}
+		%member = %this.members.value[%i];
+		%job = %this.jobs.get(%member.get("JobID"));
 
-		%memberAccount = CM_Bank.resolveAccountNumber(CM_Players.getData(%this.members.value[%i].get("BLID")).account);
+		%memberAccount = CM_Bank.resolveAccountNumber(CM_Players.getData(%member.get("BLID")).account);
 
 		if(%memberAccount == -1) {
 			continue;
 		}
 
-		%memberAccount.addFunds(%this.jobs.get(%this.members.value[%i].get("JobID")).get("Pay"), "Organization Paycheck");
+		if(%job.get("Type") $= "salary") {
+			%paycheck = mFloor(%job.get("Pay") * (getWordCount(%member.get("Completed Tasks")) / %job.get("Tasks").length));
+		} else if(%job.get("Type") $= "commission") {
+			%paycheck = (%job.get("Pay") * getWordCount(%member.get("Completed Tasks")));
+		}
+
+		%memberAccount.addFunds(%paycheck, "Organization Paycheck");
 	}
 
-	%account.removeFunds(%payment, "Salary/Commision Payout");
+	%account.removeFunds(%payment, "Salary/Commission Payout");
 }
 
 package CityMod_Organizations {
-	function CM_Tick::onWeek(%this) {
+	function CM_Tick::onDay(%this) {
 		parent::onWeek(%this);
 
 		if(isObject(CM_Organizations)) {

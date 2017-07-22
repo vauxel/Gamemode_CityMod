@@ -847,9 +847,11 @@ function servercmdCM_Organizations_setJobType(%client, %id, %jobID, %type) {
 		return;
 	}
 
-	if((%type !$= "commision") && (%type !$= "salary")) {
-		%organization.jobs.get(%jobID).set("Type", strLwr(%type));
+	if((%type !$= "commission") && (%type !$= "salary")) {
+		commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "Invalid job payment type given, must be either \"commission\" or \"salary\"");
 	}
+
+	%organization.jobs.get(%jobID).set("Type", strLwr(%type));
 }
 
 function servercmdCM_Organizations_addJobSkill(%client, %id, %jobID, %skillID) {

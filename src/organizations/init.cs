@@ -40,3 +40,5 @@ if(!isObject(CM_TasksInfo)) {
 
 	CityModOrganizationsModule.add(CM_TasksInfo);
 }
+
+CM_Players.addField("Organizations", Array());

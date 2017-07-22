@@ -49,6 +49,19 @@ package CityMod_Bricks_Property {
 			CM_RealEstate.getData(%brick.propertyID).linkPropertyBrick(%brick.getID());
 		}
 	}
+
+	function fxDTSBrick::getProperty(%brick) {
+		%property = %brick;
+		while(isObject(%property) && (%property.getDataBlock().citymodBrick["Type"] !$= "PROPERTY")) {
+			%property = %property.getDownBrick(0);
+		}
+
+		if(!isObject(%property)) {
+			return -1;
+		}
+
+		return %property;
+	}
 };
 
 if(isPackage(CityMod_Bricks_Property))
