@@ -106,7 +106,7 @@ function ArrayObject::count(%this, %value) {
 }
 
 function ArrayObject::find(%this, %value, %filter) {
-	if((%filter !$= "") && ((%delimiterPos = strPos(%filter, "_")) == -1)) {
+	if((%filter !$= "") && ((%delimiterPos = strPos(%filter, ":")) == -1)) {
 		return -1;
 	}
 

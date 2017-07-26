@@ -958,8 +958,11 @@ function servercmdCM_Organizations_addJobTask(%client, %id, %jobID, %taskID) {
 			case "NONEXISTENT_TASK":
 				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "A Task by this ID does not exist!");
 				return;
-			case "MAX_TASK_AMOUNT":
+			case "MAX_TASKS":
 				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "There are too many tasks assigned to this Job!");
+				return;
+			case "MAX_TASK_AMOUNT":
+				commandtoclient(%client, 'CM_Notification_pushDialog', "OK", "There are too many instances of this task assigned to this Job!");
 				return;
 			default: commandtoclient(%client, 'CM_errorMessage', "CM_O_aJT(3)", getWord(%return, 1)); return;
 		}

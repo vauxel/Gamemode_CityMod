@@ -316,10 +316,21 @@ function CityModOrganization::addJobTask(%this, %jobID, %taskID) {
 
 	if(%this.jobs.get(%jobID).get("Tasks").length >= $CM::Config::Organizations::MaxJobTasks) {
 		CMError(2, "CityModOrganization::addJobTask() ==> Too many tasks already exist for this job");
-		return "ERROR MAX_TASK_AMOUNT";
+		return "ERROR MAX_TASKS";
 	}
 
-	%this.jobs.get(%jobID).get("Tasks").push(%taskID);
+	%taskIndex = %this.jobs.get(%jobID).get("Tasks").find(%taskID, "field:0");
+
+	if(%taskIndex == -1) {
+		%this.jobs.get(%jobID).get("Tasks").push(%taskID TAB "1");
+	} else {
+		if(getField(%this.jobs.get(%jobID).get("Tasks").value[%taskIndex], 1) >= $CM::Config::Organizations::MaxJobTaskAmount) {
+			CMError(2, "CityModOrganization::addJobTask() ==> Too many tasks already exist for this job");
+			return "ERROR MAX_TASK_AMOUNT";
+		}
+
+		%this.jobs.get(%jobID).get("Tasks").value[%taskIndex] = %taskID TAB (getField(%this.jobs.get(%jobID).get("Tasks").value[%taskIndex], 1) + 1);
+	}
 }
 
 function CityModOrganization::removeJobTask(%this, %jobID, %taskID) {
@@ -338,14 +349,18 @@ function CityModOrganization::removeJobTask(%this, %jobID, %taskID) {
 		return "ERROR INVALID_TASKID";
 	}
 
-	%taskIndex = %this.jobs.get(%jobID).get("Tasks").find(%taskID);
+	%taskIndex = %this.jobs.get(%jobID).get("Tasks").find(%taskID, "field:0");
 
 	if(%taskIndex == -1) {
 		CMError(2, "CityModOrganization::deleteJob() ==> A task by the ID of" SPC %taskID SPC "does not exist in this job");
 		return "ERROR NONEXISTENT_TASK";
 	}
 
-	%this.jobs.get(%jobID).get("Tasks").pop(%taskIndex);
+	if(getField(%this.jobs.get(%jobID).get("Tasks").value[%taskIndex], 1) <= 1) {
+		%this.jobs.get(%jobID).get("Tasks").pop(%taskIndex);
+	} else {
+		%this.jobs.get(%jobID).get("Tasks").value[%taskIndex] = %taskID TAB (getField(%this.jobs.get(%jobID).get("Tasks").value[%taskIndex], 1) - 1);
+	}
 }
 
 function CityModOrganization::deleteJob(%this, %jobID) {
@@ -423,7 +438,8 @@ function CityModOrganization::employPlayer(%this, %bl_id, %jobID) {
 	%member = Map();
 	%member.set("BLID", %bl_id);
 	%member.set("JobID", %jobID);
-	%member.set("Completed Tasks", "");
+	%member.set("Current Tasks", Array());
+	%member.set("Completed Tasks", Array());
 	%member.set("isModerator", false);
 	%member.set("Infractions", 0);
 	%member.set("Hired", CM_Tick.getLongDate());
@@ -649,9 +665,9 @@ function CityModOrganization::payEmployees(%this) {
 		%job = %this.jobs.get(%member.get("JobID"));
 
 		if(%job.get("Type") $= "salary") {
-			%payment += mFloor(%job.get("Pay") * (getWordCount(%member.get("Completed Tasks")) / %job.get("Tasks").length));
+			%payment += mFloor(%job.get("Pay") * (%member.get("Completed Tasks").length / %job.get("Tasks").length));
 		} else if(%job.get("Type") $= "commission") {
-			%payment += (%job.get("Pay") * getWordCount(%member.get("Completed Tasks")));
+			%payment += (%job.get("Pay") * %member.get("Completed Tasks").length);
 		}
 	}
 
@@ -670,11 +686,13 @@ function CityModOrganization::payEmployees(%this) {
 		}
 
 		if(%job.get("Type") $= "salary") {
-			%paycheck = mFloor(%job.get("Pay") * (getWordCount(%member.get("Completed Tasks")) / %job.get("Tasks").length));
+			%paycheck = mFloor(%job.get("Pay") * (%member.get("Completed Tasks").length / %job.get("Tasks").length));
 		} else if(%job.get("Type") $= "commission") {
-			%paycheck = (%job.get("Pay") * getWordCount(%member.get("Completed Tasks")));
+			%paycheck = (%job.get("Pay") * %member.get("Completed Tasks").length);
 		}
 
+		%member.get("Current Tasks").clear();
+		%member.get("Completed Tasks").clear();
 		%memberAccount.addFunds(%paycheck, "Organization Paycheck");
 	}
 

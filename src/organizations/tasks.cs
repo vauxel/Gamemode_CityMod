@@ -3,14 +3,14 @@
 // Description      -      Organization Tasks Code
 // ============================================================
 
-function GameConnection::completeTask(%client, %id, %callertype, %caller) {
+function GameConnection::progressTask(%client, %id, %amount, %callertype, %caller) {
 	if(!CM_TasksInfo.recordExists(%id)) {
-		CMError(2, "GameConnection::completeTask", "Invalid \"%id\" given -- does not exist");
+		CMError(2, "GameConnection::progressTask", "Invalid \"%id\" given -- does not exist");
 		return;
 	}
 
 	if(!isObject(%caller)) {
-		CMError(2, "GameConnection::completeTask", "\"%caller\" given does not exist");
+		CMError(2, "GameConnection::progressTask", "\"%caller\" given does not exist");
 		return;
 	}
 
@@ -20,7 +20,7 @@ function GameConnection::completeTask(%client, %id, %callertype, %caller) {
 		%property = %caller.getProperty();
 
 		if(!isObject(%property)) {
-			CMError(2, "GameConnection::completeTask", "Property for the brick by the ID of" SPC %caller SPC "does not exist");
+			CMError(2, "GameConnection::progressTask", "Property for the brick by the ID of" SPC %caller SPC "does not exist");
 			return;
 		}
 
@@ -30,43 +30,59 @@ function GameConnection::completeTask(%client, %id, %callertype, %caller) {
 			return;
 		}
 
-		CM_Organizations.getData(%propertyData.owner).completeJobTask(%bl_id, %id);
+		CM_Organizations.getData(%propertyData.owner).progressJobTask(%bl_id, %id);
 	} else {
 		for(%i = 0; %i < %clientData.organizations.length; %i++) {
 			%organization = CM_Organizations.getData(%clientData.organizations.value[%i]);
-			%organization.completeJobTask(%bl_id, %id);
+			%organization.progressJobTask(%bl_id, %id);
 		}
 	}
 }
 
-function CityModOrganization::completeJobTask(%this, %bl_id, %taskID) {
+function CityModOrganization::progressJobTask(%this, %bl_id, %taskID, %amount) {
 	if(!strLen(%bl_id)) {
-		CMError(2, "CityModOrganization::completeJobTask() ==> Invalid \"%bl_id\" given -- cannot be blank");
+		CMError(2, "CityModOrganization::progressJobTask() ==> Invalid \"%bl_id\" given -- cannot be blank");
+		return;
+	}
+
+	if(!isInteger(%amount)) {
+		CMError(2, "CityModOrganization::progressJobTask() ==> Invalid \"%amount\" given -- must be a valid integer");
 		return;
 	}
 
 	%member = %this.findMember(%bl_id);
 
 	if(%member == -1) {
-		CMError(2, "CityModOrganization::completeJobTask() ==> The member BL_ID of" SPC %bl_id SPC "is not a member of the organization");
+		CMError(2, "CityModOrganization::progressJobTask() ==> The member BL_ID of" SPC %bl_id SPC "is not a member of the organization");
 		return;
 	}
 
 	if(!%this.jobExists(%member.get("JobID"))) {
-		CMError(2, "CityModOrganization::completeJobTask() ==> A job by the ID of" SPC %member.get("JobID") SPC "does not exist");
+		CMError(2, "CityModOrganization::progressJobTask() ==> A job by the ID of" SPC %member.get("JobID") SPC "does not exist");
 		return;
 	}
 
 	%job = %this.jobs.get(%member.get("JobID"));
-	%taskIndex = %job.get("Tasks").find(%taskID);
 
-	if(%taskIndex == -1) {
+	if(%job.get("Tasks").find(%taskID, "field:0") == -1) {
 		return;
 	}
 
-	if((%job.get("Type") $= "salary") && inWords(%member.get("Completed Tasks"), %taskID)) {
-		return;
-	}
+	%currentTaskIndex = %member.get("Current Tasks").find(%taskID, "field:0");
 
-	%member.set("Completed Tasks", setWord(%member.get("Completed Tasks"), getWordCount(%member.get("Completed Tasks")), %taskID));
+	if(%currentTaskIndex == -1) {
+		%member.get("Current Tasks").push(%taskID TAB %amount);
+	} else {
+		if(getField(%member.get("Current Tasks").value[%currentTaskIndex], 1) >= getField(%job.get("Tasks"), 1)) {
+			%member.get("Current Tasks").pop(%currentTaskIndex);
+
+			if((%job.get("Type") $= "salary") && (%member.get("Completed Tasks").find(%taskID) != -1)) {
+				return;
+			}
+
+			%member.get("Completed Tasks").push(%taskID);
+		} else {
+			%member.get("Current Tasks").value[%currentTaskIndex] = %taskID TAB (getField(%member.get("Current Tasks").value[%currentTaskIndex], 1) + %amount);
+		}
+	}
 }
