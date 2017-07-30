@@ -9,7 +9,7 @@ function GameConnection::progressTask(%client, %id, %amount, %callertype, %calle
 		return;
 	}
 
-	if(!isObject(%caller)) {
+	if((%callertype !$= "CONSOLE") && !isObject(%caller)) {
 		CMError(2, "GameConnection::progressTask", "\"%caller\" given does not exist");
 		return;
 	}
@@ -30,12 +30,39 @@ function GameConnection::progressTask(%client, %id, %amount, %callertype, %calle
 			return;
 		}
 
-		CM_Organizations.getData(%propertyData.owner).progressJobTask(%bl_id, %id);
+		CM_Organizations.getData(%propertyData.owner).progressJobTask(%client.bl_id, %id, %amount);
 	} else {
 		for(%i = 0; %i < %clientData.organizations.length; %i++) {
 			%organization = CM_Organizations.getData(%clientData.organizations.value[%i]);
-			%organization.progressJobTask(%bl_id, %id);
+			%organization.progressJobTask(%client.bl_id, %id, %amount);
 		}
+	}
+
+	servercmdCM_Infopanel_requestTasks(%client);
+}
+
+function CityModOrganization::refreshMemberTasks(%this, %bl_id) {
+	if(!strLen(%bl_id)) {
+		CMError(2, "CityModOrganization::refreshMemberTasks() ==> Invalid \"%bl_id\" given -- cannot be blank");
+		return;
+	}
+
+	%memberIndex = %this.findMember(%bl_id);
+
+	if(%memberIndex == -1) {
+		CMError(2, "CityModOrganization::refreshMemberTasks() ==> The member BL_ID of" SPC %bl_id SPC "is not a member of the organization");
+		return;
+	}
+
+	%member = %this.members.value[%memberIndex];
+
+	%member.get("Current Tasks").clear();
+	%member.get("Completed Tasks").clear();
+
+	%jobTasks = %this.jobs.get(%member.get("JobID")).get("Tasks");
+
+	for(%i = 0; %i < %jobTasks.length; %i++) {
+		%member.get("Current Tasks").push(getField(%jobTasks.value[%i], 0) TAB "0");
 	}
 }
 
@@ -45,17 +72,23 @@ function CityModOrganization::progressJobTask(%this, %bl_id, %taskID, %amount) {
 		return;
 	}
 
+	if(!strLen(%amount)) {
+		%amount = 1;
+	}
+
 	if(!isInteger(%amount)) {
 		CMError(2, "CityModOrganization::progressJobTask() ==> Invalid \"%amount\" given -- must be a valid integer");
 		return;
 	}
 
-	%member = %this.findMember(%bl_id);
+	%memberIndex = %this.findMember(%bl_id);
 
-	if(%member == -1) {
+	if(%memberIndex == -1) {
 		CMError(2, "CityModOrganization::progressJobTask() ==> The member BL_ID of" SPC %bl_id SPC "is not a member of the organization");
 		return;
 	}
+
+	%member = %this.members.value[%memberIndex];
 
 	if(!%this.jobExists(%member.get("JobID"))) {
 		CMError(2, "CityModOrganization::progressJobTask() ==> A job by the ID of" SPC %member.get("JobID") SPC "does not exist");
@@ -63,26 +96,33 @@ function CityModOrganization::progressJobTask(%this, %bl_id, %taskID, %amount) {
 	}
 
 	%job = %this.jobs.get(%member.get("JobID"));
+	%taskIndex = %job.get("Tasks").find(%taskID, "field:0");
 
-	if(%job.get("Tasks").find(%taskID, "field:0") == -1) {
+	if(%taskIndex == -1) {
 		return;
 	}
 
 	%currentTaskIndex = %member.get("Current Tasks").find(%taskID, "field:0");
 
-	if(%currentTaskIndex == -1) {
-		%member.get("Current Tasks").push(%taskID TAB %amount);
+	if(%currentTaskIndex == -1) { // Player has already completed the task
+		return;
 	} else {
-		if(getField(%member.get("Current Tasks").value[%currentTaskIndex], 1) >= getField(%job.get("Tasks"), 1)) {
-			%member.get("Current Tasks").pop(%currentTaskIndex);
+		%amount += getField(%member.get("Current Tasks").value[%currentTaskIndex], 1);
 
-			if((%job.get("Type") $= "salary") && (%member.get("Completed Tasks").find(%taskID) != -1)) {
-				return;
+		if(%amount >= getField(%job.get("Tasks").value[%taskIndex], 1)) {
+			if(%job.get("Type") $= "salary") {
+				%member.get("Current Tasks").pop(%currentTaskIndex);
+				%member.get("Completed Tasks").push(%taskID);
+			} else if(%job.get("Type") $= "commission") {
+				while(%amount >= getField(%job.get("Tasks").value[%taskIndex], 1)) {
+					%amount -= getField(%job.get("Tasks").value[%taskIndex], 1);
+					%member.get("Completed Tasks").push(%taskID);
+				}
+
+				%member.get("Current Tasks").value[%currentTaskIndex] = %taskID TAB %amount;
 			}
-
-			%member.get("Completed Tasks").push(%taskID);
 		} else {
-			%member.get("Current Tasks").value[%currentTaskIndex] = %taskID TAB (getField(%member.get("Current Tasks").value[%currentTaskIndex], 1) + %amount);
+			%member.get("Current Tasks").value[%currentTaskIndex] = %taskID TAB %amount;
 		}
 	}
 }

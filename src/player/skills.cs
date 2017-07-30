@@ -73,6 +73,7 @@ function servercmdCM_Skills_unlockSkill(%client, %skillset, %skill) {
 
 	commandtoclient(%client, 'CM_Skills_showSkillUnlocked', %skillsetSO.getRecord(%skill, "Name"));
 	commandtoclient(%client, 'CM_Skills_refreshSkills');
+	servercmdCM_Infopanel_requestSkillsets(%client);
 }
 
 // ============================================================
@@ -150,6 +151,11 @@ function CM_SkillsInfo::addSkillSet(%this, %rawname, %name) {
 // ============================================================
 // Section 3 - Player Functions
 // ============================================================
+function GameConnection::addSkillXP(%client, %skillset, %value) {
+	CM_Players.getData(%client.bl_id).skills.addXP(%skillset, %value);
+	servercmdCM_Infopanel_requestSkillset(%client, %skillset);
+}
+
 function CityModPlayer::hasSkill(%this, %skillID) {
 	return %this.skills.hasSkill(%skillID);
 }
@@ -203,15 +209,13 @@ function CityModPlayerSkills::addXP(%this, %skillset, %value) {
 	%skillsetSO = %this.getSkillSet(%skillset);
 	%value += %skillsetSO.get("XP");
 
-	while(%value > 0) {
-		%reqXP = %this.getReqXP(%skillset);
-		if(%value >= %reqXP) {
-			%value -= %reqXP;
-			%this.addLevel(%skillset, 1);
-		} else {
-			%skillsetSO.set("XP", %value);
-		}
+	while(%value >= (%reqXP = %this.getReqXP(%skillset))) {
+		echo(%value TAB %reqXP);
+		%value -= %reqXP;
+		%this.addLevel(%skillset, 1);
 	}
+
+	%skillsetSO.set("XP", %value);
 }
 
 function CityModPlayerSkills::addLevel(%this, %skillset, %value) {

@@ -171,6 +171,11 @@ function CityModDatabase::syncData(%this, %id, %dataTrim) {
 		while((%field = %data.getTaggedField(%index)) !$= "") {
 			%name = getField(%field, 0);
 
+			if(%name $= "dataID") {
+				%index++;
+				continue;
+			}
+
 			if(!%this.fieldTable.keys.contains(%name)) {
 				%deleteList = setField(%deleteList, getFieldCount(%deleteList), %name);
 			}
@@ -291,6 +296,12 @@ function CityModDatabase::saveData(%this, %id) {
 	%data = %this.dataTable.get(%id); %index = 0;
 	while((%field = %data.getTaggedField(%index)) !$= "") {
 		%name = getField(%field, 0);
+
+		if(%name $= "dataID") {
+			%index++;
+			continue;
+		}
+
 		%file.writeLine("#" @ %name TAB Stringify::serialize(getFields(%field, 1), false));
 		%index++;
 	}

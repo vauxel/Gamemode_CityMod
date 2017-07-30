@@ -35,7 +35,7 @@ function servercmdCM_Organizations_requestOrganizations(%client) {
 			continue;
 		}
 
-		commandtoclient(%client, 'CM_Organizations_addOrganization', %id, %organization.type, %organization.open, CM_Players.getData(%organization.owner).name, %organization.name, (%organization.members.length + 1), %organization.getJobOpenings(), (%organization.memberExists(%client.bl_id) || (%organization.owner == %client.bl_id)));
+		commandtoclient(%client, 'CM_Organizations_addOrganization', %id, %organization.type, %organization.open, CM_Players.getData(%organization.owner).name, %organization.name, %organization.members.length, %organization.getJobOpenings(), (%organization.memberExists(%client.bl_id) || (%organization.owner == %client.bl_id)));
 	}
 }
 
@@ -261,11 +261,8 @@ function servercmdCM_Organizations_requestJobTasks(%client, %id, %jobID) {
 	}
 
 	for(%i = 0; %i < %organization.jobs.get(%jobID).get("Tasks").length; %i++) {
-		%taskID = %organization.jobs.get(%jobID).get("Tasks").value[%i];
-		%taskName = CM_TasksInfo.getRecord(%taskID, "Name");
-		%taskDescription = CM_TasksInfo.getRecord(%taskID, "Description");
-
-		commandtoclient(%client, 'CM_Organizations_addJobTask', %taskID, %taskName, %taskDescription);
+		%task = %organization.jobs.get(%jobID).get("Tasks").value[%i];
+		commandtoclient(%client, 'CM_Organizations_addJobTask', getField(%task, 0), CM_TasksInfo.getRecord(getField(%task, 0), "Name"), getField(%task, 1));
 	}
 }
 

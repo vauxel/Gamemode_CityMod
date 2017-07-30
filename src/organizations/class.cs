@@ -444,6 +444,12 @@ function CityModOrganization::employPlayer(%this, %bl_id, %jobID) {
 	%member.set("Infractions", 0);
 	%member.set("Hired", CM_Tick.getLongDate());
 
+	%jobTasks = %this.jobs.get(%jobID).get("Tasks");
+
+	for(%i = 0; %i < %jobTasks.length; %i++) {
+		%member.get("Current Tasks").push(getField(%jobTasks.value[%i], 0) TAB "0");
+	}
+
 	%this.members.push(%member);
 
 	CM_Players.getData(%bl_id).organizations.push(%this.dataID);
@@ -665,7 +671,7 @@ function CityModOrganization::payEmployees(%this) {
 		%job = %this.jobs.get(%member.get("JobID"));
 
 		if(%job.get("Type") $= "salary") {
-			%payment += mFloor(%job.get("Pay") * (%member.get("Completed Tasks").length / %job.get("Tasks").length));
+			%payment += mFloor(%job.get("Pay") * (%member.get("Completed Tasks").length / (%member.get("Current Tasks").length + %member.get("Completed Tasks").length)));
 		} else if(%job.get("Type") $= "commission") {
 			%payment += (%job.get("Pay") * %member.get("Completed Tasks").length);
 		}
@@ -686,13 +692,12 @@ function CityModOrganization::payEmployees(%this) {
 		}
 
 		if(%job.get("Type") $= "salary") {
-			%paycheck = mFloor(%job.get("Pay") * (%member.get("Completed Tasks").length / %job.get("Tasks").length));
+			%paycheck = mFloor(%job.get("Pay") * (%member.get("Completed Tasks").length / (%member.get("Current Tasks").length + %member.get("Completed Tasks").length)));
 		} else if(%job.get("Type") $= "commission") {
 			%paycheck = (%job.get("Pay") * %member.get("Completed Tasks").length);
 		}
 
-		%member.get("Current Tasks").clear();
-		%member.get("Completed Tasks").clear();
+		%this.refreshMemberTasks(%member.get("BLID"));
 		%memberAccount.addFunds(%paycheck, "Organization Paycheck");
 	}
 
@@ -705,7 +710,8 @@ package CityMod_Organizations {
 
 		if(isObject(CM_Organizations)) {
 			for(%i = 0; %i < CM_Organizations.dataTable.keys.length; %i++) {
-				CM_Organizations.dataTable.get(CM_Organizations.dataTable.keys.value[%i]).payEmployees();
+				%organization = CM_Organizations.dataTable.get(CM_Organizations.dataTable.keys.value[%i]);
+				%organization.payEmployees();
 			}
 		}
 	}

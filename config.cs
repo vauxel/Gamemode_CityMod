@@ -51,7 +51,7 @@ $CM::Config::Organizations::MaxJobTaskAmount = 500;
 $CM::Config::Players::MaxBuildHeight = 256;
 $CM::Config::Players::MaxSkillLevel = 100;
 
-$CM::Config::Players::SkillXPMultiplier = 1.25;
+$CM::Config::Players::SkillXPMultiplier = 1.15;
 
 $CM::Config::Players::DamagePrec["head"] = 200; // %
 $CM::Config::Players::DamagePrec["torso"] = 100; // %
