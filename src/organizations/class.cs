@@ -24,26 +24,17 @@ function CM_Organizations::createOrganization(%this, %ownerBL_ID, %name, %type) 
 		return "ERROR INVALID_TYPE";
 	}
 
-	%id = 1;
-	// If one plus one doesn't equal two then you have bigger problems other than this loop not running
-	while((1 + 1) == 2) {
-		if(!isFile(%this.getDataPath(%id))) {
-			break;
-		}
-		%id++;
-	}
-
-	%organization = %this.addData(%id);
+	%organization = %this.addData();
 	%organization.owner = %ownerBL_ID;
 	%organization.name = %name;
 	%organization.type = properText(%type);
 	%organization.founded = CM_Tick.getLongDate();
 	%organization.founder = %ownerBL_ID;
-	%organization.account = CM_Bank.registerAccount("organization", %id);
+	%organization.account = CM_Bank.registerAccount("organization", %organization.dataID);
 
 	%organization.createJob("Default Job", "This job's description has not been set", 0, 0, false);
 
-	return %id;
+	return %organization.dataID;
 }
 
 function CityModOrganization::disband(%this) {

@@ -26,10 +26,11 @@ package CityMod_Bricks_Restriction {
 			return;
 		}
 
+		%datablock = %brick.getDataBlock();
 		%client = %brick.getGroup().client;
 
-		if(!%onLoad && !%client.inCMDevMode) {
-			if(!%datablock.isCityModBrick || (%datablock.isCityModBrick && (%datablock.citymodBrick["Type"] !$= "PROPERTY"))) {
+		if(!%onLoad) {
+			if(!%client.inCMDevMode && (!%datablock.isCityModBrick || (%datablock.isCityModBrick && (%datablock.citymodBrick["Type"] !$= "PROPERTY")))) {
 				// Lot Existence Check
 				%property = %brick;
 				while(isObject(%property) && (%property.getDataBlock().citymodBrick["Type"] !$= "PROPERTY")) {

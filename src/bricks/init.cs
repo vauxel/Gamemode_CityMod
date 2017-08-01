@@ -16,5 +16,3 @@ if(!isObject(CM_BricksSaver)) {
 
 	CityModBricksModule.add(CM_BricksSaver);
 }
-
-CM_BricksSaver.addSavedField("inventory");

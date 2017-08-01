@@ -251,15 +251,10 @@ function CM_Bank::registerAccount(%this, %type, %owner) {
 		return "ERROR INVALID_TYPE";
 	}
 
-	%id = 1;
-	while(isFile(%this.getDataPath(%id))) {
-		%id++;
-	}
-
-	%account = %this.addData(%id);
+	%account = %this.addData();
 	%account.type = %type;
 	%account.owner = %owner;
-	%account.number = %this.generateAccountNumber(%type, %id);
+	%account.number = %this.generateAccountNumber(%type, %account.dataID);
 	%account.pin = %this.generatePIN();
 
 	return %account.number;

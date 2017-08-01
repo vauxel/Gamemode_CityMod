@@ -125,6 +125,18 @@ function CityModDatabase::addData(%this, %id) {
 		return "ERROR";
 	}
 
+	if(strLen(%id)) {
+		if(!isInteger(%id)) {
+			CMError(1, nonempty(%this.getName(), %this.getID()) @ "::addData", "ID must be an integer");
+			return "ERROR";
+		}
+	} else {
+		%id = 1;
+		while(isFile(%this.getDataPath(%id))) {
+			%id++;
+		}
+	}
+
 	%data = %this.createDataSO(%id);
 
 	for(%i = 0; %i < %this.fieldTable.keys.length; %i++) {
